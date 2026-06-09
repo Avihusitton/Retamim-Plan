@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Heebo', sans-serif;
+
+  --color-desert-100: #f5f0e6;
+  --color-desert-200: #e8dcc4;
+  --color-desert-300: #d6c19e;
+  --color-desert-400: #c2a176;
+  --color-desert-500: #b08955;
+  --color-desert-600: #9e7446;
+  --color-desert-700: #825e3a;
+  --color-desert-800: #6b4d32;
+  --color-desert-900: #58412b;
+
+  --color-earth-100: #eef1ec;
+  --color-earth-200: #d6ded1;
+  --color-earth-300: #b5c4ad;
+  --color-earth-400: #91a486;
+  --color-earth-500: #748967;
+  --color-earth-600: #5a6e4f;
+  --color-earth-700: #48583f;
+  --color-earth-800: #3b4734;
+  --color-earth-900: #313c2c;
+
+  --color-terracotta-100: #faebe8;
+  --color-terracotta-200: #f2cfc7;
+  --color-terracotta-300: #e7a89d;
+  --color-terracotta-400: #da7b6e;
+  --color-terracotta-500: #cf5748;
+  --color-terracotta-600: #b84133;
+  --color-terracotta-700: #9a3529;
+  --color-terracotta-800: #802e24;
+  --color-terracotta-900: #6a2a22;
+}
+
+body {
+  font-family: 'Heebo', sans-serif;
+  background-color: var(--color-desert-100);
+  color: #333;
+  direction: rtl;
+}
+
+@layer utilities {
+  .print-only {
+    display: none;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-root, #print-root * {
+    visibility: visible;
+  }
+  #print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .print-only {
+    display: block;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
