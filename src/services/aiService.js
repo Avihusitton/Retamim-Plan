@@ -4,6 +4,7 @@ Your task is to analyze their needs and provide architectural recommendations wi
 1. Optimal house orientation.
 2. Sun exposure management (summer vs. winter).
 3. Wind utilization and protection.
+4. Optimal physical footprint layout shape defined by corner coordinates (in meters relative to a centered grid).
 
 You must respond with ONLY a valid JSON object. Do not include markdown formatting like \`\`\`json.
 The JSON must have the following structure:
@@ -24,7 +25,8 @@ The JSON must have the following structure:
     "windProtection": {
       "direction": "nw", // string, where the prevailing wind comes from
       "strategy": "string describing protection"
-    }
+    },
+    "corners": [[0,0], [12,0], [12,9], [0,9]] // Array of 2D coordinates [x, y] in meters describing the building footprint (minimum 3 coordinates, standard values around 0-15m bounds).
   }
 }
 `;

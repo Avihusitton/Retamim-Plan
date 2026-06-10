@@ -1,0 +1,56 @@
+{
+  "_comment": "Regional climate profiles for house planning. Do not hardcode these values in application code. Always read from this file.",
+  "regions": {
+    "central_israel": {
+      "label": "מרכז ישראל",
+      "avg_temp_summer_c": 30,
+      "avg_temp_winter_c": 12,
+      "prevailing_wind_direction_deg": 270,
+      "prevailing_wind_label": "מערב",
+      "solar_hours_per_day_monthly": [6, 7, 8, 9, 10, 11, 11, 10, 9, 8, 7, 6],
+      "summer_shading_critical": true,
+      "winter_solar_gain_desired": true,
+      "typical_building_setback_m": 3,
+      "notes": "Hot-dry summers, mild winters. South-facing living areas optimal. Shade pergolas on west recommended."
+    },
+    "northern_israel": {
+      "label": "צפון ישראל",
+      "avg_temp_summer_c": 26,
+      "avg_temp_winter_c": 8,
+      "prevailing_wind_direction_deg": 315,
+      "prevailing_wind_label": "צפון-מערב",
+      "solar_hours_per_day_monthly": [5, 6, 7, 8, 9, 10, 10, 9, 8, 7, 6, 5],
+      "summer_shading_critical": false,
+      "winter_solar_gain_desired": true,
+      "typical_building_setback_m": 3,
+      "notes": "More rainfall, cooler winters. Windbreak from northwest direction important. Good natural ventilation."
+    },
+    "southern_israel": {
+      "label": "דרום ישראל",
+      "avg_temp_summer_c": 36,
+      "avg_temp_winter_c": 15,
+      "prevailing_wind_direction_deg": 225,
+      "prevailing_wind_label": "דרום-מערב",
+      "solar_hours_per_day_monthly": [7, 8, 9, 10, 11, 12, 12, 11, 10, 9, 8, 7],
+      "summer_shading_critical": true,
+      "winter_solar_gain_desired": false,
+      "typical_building_setback_m": 4,
+      "notes": "Extreme summer heat. Maximum shading and thermal mass critical. North-facing or shaded courtyards preferred."
+    }
+  },
+  "solar_orientation_rules": {
+    "living_room": "south",
+    "kitchen": "east",
+    "bedrooms": "east",
+    "bathrooms": "north",
+    "storage_utility": "north",
+    "garage": "any",
+    "home_office": "north_or_east"
+  },
+  "orientation_rationale": {
+    "south": "Maximum winter sun exposure for passive solar heating",
+    "east": "Morning sun — comfortable for bedrooms and kitchens",
+    "north": "Diffuse light — no direct sun, good for utility areas",
+    "west": "Afternoon sun — can cause overheating in summer, use shading"
+  }
+}
