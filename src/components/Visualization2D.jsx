@@ -14,7 +14,8 @@ const Visualization2D = () => {
     dayOfYear,
     showWind,
     buildingHeight,
-    houseCorners
+    houseCorners,
+    houseZoom
   } = useStore();
 
   // 1. Calculate Solar Position
@@ -93,7 +94,7 @@ const Visualization2D = () => {
   const footprintWidth = maxX - minX;
   const footprintHeight = maxY - minY;
   const maxFootprintDim = Math.max(footprintWidth, footprintHeight);
-  const scale = maxFootprintDim > 0 ? 120 / maxFootprintDim : (80 / 12);
+  const scale = (maxFootprintDim > 0 ? 120 / maxFootprintDim : (80 / 12)) * houseZoom;
 
   // Calculate House Shadow based on buildingHeight (standard 2.8m per floor)
   const elevRad = elevation * Math.PI / 180;

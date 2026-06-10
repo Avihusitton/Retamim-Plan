@@ -75,6 +75,10 @@ const useStore = create((set) => ({
 
   showWind: true,
   setShowWind: (show) => set({ showWind: show }),
+
+  // House footprint zoom factor
+  houseZoom: 1.0,
+  setHouseZoom: (zoom) => set({ houseZoom: zoom }),
 }));
 
 export default useStore;

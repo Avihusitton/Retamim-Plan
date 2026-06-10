@@ -35,7 +35,8 @@ const App = () => {
     dayOfYear, setDayOfYear,
     showWind, setShowWind,
     buildingHeight, setBuildingHeight,
-    houseCorners, setHouseCorners
+    houseCorners, setHouseCorners,
+    houseZoom, setHouseZoom
   } = useStore();
 
   const [copySuccess, setCopySuccess] = useState(false);
@@ -229,463 +230,498 @@ ${userNeeds}`;
       </header>
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="max-w-7xl mx-auto p-4 md:p-6 flex flex-col gap-6">
 
-        {/* Sidebar Controls (4 columns wide) */}
-        <div className="lg:col-span-5 flex flex-col gap-6 no-print">
-
+        {/* Top Section: Inputs side-by-side */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 no-print">
+          
           {/* Location and Coordinates Card */}
-          <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200">
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-desert-800 border-b border-desert-100 pb-2">
-              <Globe className="w-5 h-5 text-terracotta-600" />
-              הגדרת מיקום וקורדינטות
-            </h2>
-            
-            <div className="space-y-4">
-              {/* Preset Selector */}
-              <div>
-                <label className="block text-sm font-medium text-desert-700 mb-1">בחר יישוב / מיקום מהיר:</label>
-                <select
-                  value={selectedPreset}
-                  onChange={(e) => handlePresetChange(e.target.value)}
-                  className="w-full p-2 border border-desert-300 rounded-lg focus:ring-2 focus:ring-terracotta-400 focus:border-terracotta-400 bg-desert-50 text-sm"
-                >
-                  {locationPresets.map(p => (
-                    <option key={p.name} value={p.name}>{p.name}</option>
-                  ))}
-                  <option value="custom">קורדינטות מותאמות אישית...</option>
-                </select>
-              </div>
-
-              {/* Coordinates input */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-desert-600 mb-0.5">קו רוחב (Latitude):</label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={customLat}
-                    onChange={(e) => {
-                      setCustomLat(e.target.value);
-                      setSelectedPreset('custom');
-                    }}
-                    className="w-full p-2 border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 text-sm font-mono bg-desert-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-desert-600 mb-0.5">קו אורך (Longitude):</label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={customLng}
-                    onChange={(e) => {
-                      setCustomLng(e.target.value);
-                      setSelectedPreset('custom');
-                    }}
-                    className="w-full p-2 border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 text-sm font-mono bg-desert-50"
-                  />
-                </div>
-              </div>
-
-              {/* Apply Coordinates Button */}
-              {selectedPreset === 'custom' && (
-                <button
-                  onClick={handleCustomCoordsSubmit}
-                  className="w-full bg-desert-800 hover:bg-desert-950 text-white font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
-                >
-                  החל קורדינטות מותאמות
-                </button>
-              )}
-            </div>
-          </section>
-
-          {/* AI Plan Input / Integration Card */}
-          <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200">
-            <div className="flex justify-between items-center mb-3 border-b border-desert-100 pb-2">
-              <h2 className="text-lg font-bold flex items-center gap-2 text-desert-800">
-                <FileText className="w-5 h-5 text-terracotta-600" />
-                תיאור ותכנון אדריכלי מ-AI
+          <div className="lg:col-span-5">
+            <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200 h-full">
+              <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-desert-800 border-b border-desert-100 pb-2">
+                <Globe className="w-5 h-5 text-terracotta-600" />
+                הגדרת מיקום וקורדינטות
               </h2>
-              <div className="flex bg-desert-100 p-0.5 rounded-lg text-xs">
-                <button
-                  className={`px-2.5 py-1 rounded-md transition-colors ${aiMode === 'manual' ? 'bg-white shadow-sm text-terracotta-700 font-bold' : 'text-desert-600'}`}
-                  onClick={() => setAiMode('manual')}
-                >
-                  הדבקת טקסט (חינם)
-                </button>
-                <button
-                  className={`px-2.5 py-1 rounded-md transition-colors ${aiMode === 'api' ? 'bg-white shadow-sm text-terracotta-700 font-bold' : 'text-desert-600'}`}
-                  onClick={() => setAiMode('api')}
-                >
-                  חיבור API
-                </button>
-              </div>
-            </div>
-
-            {aiMode === 'api' ? (
-              <div className="space-y-3">
+              
+              <div className="space-y-4">
+                {/* Preset Selector */}
                 <div>
-                  <label className="block text-xs text-desert-700 mb-1">מפתח OpenAI API (sk-...):</label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full p-2 text-sm border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 bg-desert-50 font-mono"
-                    placeholder="הזן מפתח API מ-OpenAI"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-desert-700 mb-1">חלומות/דרישות מהבית המדברי שלך:</label>
-                  <textarea
-                    value={userNeeds}
-                    onChange={(e) => setUserNeeds(e.target.value)}
-                    placeholder="לדוגמה: בית בגודל 150 מ&quot;ר ברתמים, עם פטיו פנימי לקירור פסיבי, חלונות גדולים הפונים לשמש החורף אך מוצלים בקיץ..."
-                    className="w-full h-20 p-2.5 border border-desert-300 rounded-lg focus:ring-2 focus:ring-terracotta-400 bg-desert-50 text-sm resize-none"
-                  />
-                </div>
-                <button
-                  onClick={handleApiSubmit}
-                  disabled={isLoading}
-                  className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
-                >
-                  {isLoading ? 'מנתח דרישות באמצעות AI...' : 'שגר ניתוח אדריכלי אוטומטי'}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-desert-600 leading-relaxed">
-                  העתק את ההוראות מטה לכל מנוע AI (כמו ChatGPT או Claude) והדבק את התשובה (טקסט חופשי או JSON) בתיבה לקבלת סימולציה והעמדה מיידית.
-                </p>
-                
-                {/* User Input Prompt Builder */}
-                <div>
-                  <label className="block text-xs font-bold text-desert-700 mb-1">1. הגדר צרכים וחלום (אופציונלי):</label>
-                  <textarea
-                    value={userNeeds}
-                    onChange={(e) => setUserNeeds(e.target.value)}
-                    placeholder="לדוגמה: בית מדברי מואר ברתמים עם הגנה מסופות חול צפון-מערביות..."
-                    className="w-full h-14 p-2 border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 bg-desert-50 text-xs resize-none"
-                  />
-                </div>
-
-                <div className="relative">
-                  <div className="bg-desert-50 text-desert-800 p-2 border border-desert-200 rounded-lg text-[10px] h-16 overflow-y-auto font-mono scrollbar-thin" dir="ltr">
-                    {generatedPrompt}
-                  </div>
-                  <button
-                    onClick={handleCopyPrompt}
-                    className="absolute top-2 right-2 bg-white/95 p-1 rounded border border-desert-200 shadow-xs hover:bg-desert-100 text-desert-700 transition-colors"
-                    title="העתק פרומפט"
-                  >
-                    {copySuccess ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-desert-700 mb-1">2. הדבק את תיאור התכנון מה-AI:</label>
-                  <textarea
-                    className="w-full h-24 p-2.5 border border-desert-300 rounded-lg focus:ring-2 focus:ring-terracotta-400 bg-desert-50 text-xs font-mono"
-                    placeholder="הדבק כאן את תוצאת ה-AI (פסקה חופשית שמתארת העמדה, כיווני רוח והמלצות, או אובייקט JSON)..."
-                    value={aiResponse}
-                    onChange={(e) => setAiResponse(e.target.value)}
-                  />
-                </div>
-
-                <button
-                  onClick={handleApplyAiText}
-                  className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
-                >
-                  החל ונתח תכנון AI
-                </button>
-              </div>
-            )}
-
-            {errorMsg && (
-              <div className="mt-3 bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded-lg flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-          </section>
-
-          {/* Manual Simulation Overrides & Fine-tuning */}
-          <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200">
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-desert-800 border-b border-desert-100 pb-2">
-              <Sliders className="w-5 h-5 text-terracotta-600" />
-              בקרת סימולציה וכיוונון ידני
-            </h2>
-
-            <div className="space-y-4">
-              {/* House Rotation Slider */}
-              <div>
-                <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
-                  <span>זווית העמדת הבית (סיבוב):</span>
-                  <span className="font-mono text-terracotta-600 font-bold">{houseRotation}°</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="360"
-                  value={houseRotation}
-                  onChange={(e) => setHouseRotation(parseInt(e.target.value, 10))}
-                  className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
-                />
-                <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
-                  <span>0° (צפון)</span>
-                  <span>90° (מזרח)</span>
-                  <span>180° (דרום)</span>
-                  <span>270° (מערב)</span>
-                  <span>360°</span>
-                </div>
-              </div>
-
-              {/* Month Selector */}
-              <div>
-                <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
-                  <span>חודש בשנה (עונות):</span>
-                  <span className="text-terracotta-600 font-bold">חודש {selectedMonth} - {getHebrewMonthName(selectedMonth)}</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="12"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
-                  className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
-                />
-                <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
-                  <span>ינואר (חורף)</span>
-                  <span>אפריל (אביב)</span>
-                  <span>יולי (קיץ)</span>
-                  <span>אוקטובר (סתיו)</span>
-                </div>
-              </div>
-
-              {/* Hour of Day Slider */}
-              <div>
-                <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
-                  <span>שעה ביום (00:00 - 24:00):</span>
-                  <span className="font-mono text-terracotta-600 font-bold">
-                    {hour.toString().padStart(2, '0')}:00
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="24"
-                  value={hour}
-                  onChange={(e) => setHour(parseInt(e.target.value, 10))}
-                  className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
-                />
-                <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
-                  <span>חצות</span>
-                  <span>06:00 (זריחה)</span>
-                  <span>12:00 (צהריים)</span>
-                  <span>18:00 (שקיעה)</span>
-                  <span>חצות</span>
-                </div>
-              </div>
-
-              {/* Wind Direction Selector */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-desert-700 mb-1">כיוון רוח נושבת:</label>
+                  <label className="block text-sm font-medium text-desert-700 mb-1">בחר יישוב / מיקום מהיר:</label>
                   <select
-                    value={windDirection}
-                    onChange={(e) => setWindDirection(e.target.value)}
-                    className="w-full p-2 border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 bg-desert-50 text-xs"
+                    value={selectedPreset}
+                    onChange={(e) => handlePresetChange(e.target.value)}
+                    className="w-full p-2 border border-desert-300 rounded-lg focus:ring-2 focus:ring-terracotta-400 focus:border-terracotta-400 bg-desert-50 text-sm"
                   >
-                    <option value="nw">צפון-מערבית (NW)</option>
-                    <option value="w">מערבית (W)</option>
-                    <option value="sw">דרום-מערבית (SW)</option>
-                    <option value="s">דרומית (S)</option>
-                    <option value="se">דרום-מזרחית (SE)</option>
-                    <option value="e">מזרחית (E)</option>
-                    <option value="ne">צפון-מזרחית (NE)</option>
-                    <option value="n">צפונית (N)</option>
+                    {locationPresets.map(p => (
+                      <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                    <option value="custom">קורדינטות מותאמות אישית...</option>
                   </select>
                 </div>
+
+                {/* Coordinates input */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-desert-600 mb-0.5">קו רוחב (Latitude):</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={customLat}
+                      onChange={(e) => {
+                        setCustomLat(e.target.value);
+                        setSelectedPreset('custom');
+                      }}
+                      className="w-full p-2 border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 text-sm font-mono bg-desert-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-desert-600 mb-0.5">קו אורך (Longitude):</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={customLng}
+                      onChange={(e) => {
+                        setCustomLng(e.target.value);
+                        setSelectedPreset('custom');
+                      }}
+                      className="w-full p-2 border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 text-sm font-mono bg-desert-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Apply Coordinates Button */}
+                {selectedPreset === 'custom' && (
+                  <button
+                    onClick={handleCustomCoordsSubmit}
+                    className="w-full bg-desert-800 hover:bg-desert-950 text-white font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+                  >
+                    החל קורדינטות מותאמות
+                  </button>
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* AI Plan Input / Integration Card */}
+          <div className="lg:col-span-7">
+            <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200 h-full">
+              <div className="flex justify-between items-center mb-3 border-b border-desert-100 pb-2">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-desert-800">
+                  <FileText className="w-5 h-5 text-terracotta-600" />
+                  תיאור ותכנון אדריכלי מ-AI
+                </h2>
+                <div className="flex bg-desert-100 p-0.5 rounded-lg text-xs">
+                  <button
+                    className={`px-2.5 py-1 rounded-md transition-colors ${aiMode === 'manual' ? 'bg-white shadow-sm text-terracotta-700 font-bold' : 'text-desert-600'}`}
+                    onClick={() => setAiMode('manual')}
+                  >
+                    הדבקת טקסט (חינם)
+                  </button>
+                  <button
+                    className={`px-2.5 py-1 rounded-md transition-colors ${aiMode === 'api' ? 'bg-white shadow-sm text-terracotta-700 font-bold' : 'text-desert-600'}`}
+                    onClick={() => setAiMode('api')}
+                  >
+                    חיבור API
+                  </button>
+                </div>
+              </div>
+
+              {aiMode === 'api' ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-desert-700 mb-1">מפתח OpenAI API (sk-...):</label>
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="w-full p-2 text-sm border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 bg-desert-50 font-mono"
+                      placeholder="הזן מפתח API מ-OpenAI"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-desert-700 mb-1">חלומות/דרישות מהבית המדברי שלך:</label>
+                    <textarea
+                      value={userNeeds}
+                      onChange={(e) => setUserNeeds(e.target.value)}
+                      placeholder="לדוגמה: בית בגודל 150 מ&quot;ר ברתמים, עם פטיו פנימי לקירור פסיבי, חלונות גדולים הפונים לשמש החורף אך מוצלים בקיץ..."
+                      className="w-full h-20 p-2.5 border border-desert-300 rounded-lg focus:ring-2 focus:ring-terracotta-400 bg-desert-50 text-sm resize-none"
+                    />
+                  </div>
+                  <button
+                    onClick={handleApiSubmit}
+                    disabled={isLoading}
+                    className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                  >
+                    {isLoading ? 'מנתח דרישות באמצעות AI...' : 'שגר ניתוח אדריכלי אוטומטי'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-desert-600 leading-relaxed">
+                    העתק את ההוראות מטה לכל מנוע AI (כמו ChatGPT או Claude) והדבק את התשובה (טקסט חופשי או JSON) בתיבה לקבלת סימולציה והעמדה מיידית.
+                  </p>
+                  
+                  {/* User Input Prompt Builder */}
+                  <div>
+                    <label className="block text-xs font-bold text-desert-700 mb-1">1. הגדר צרכים וחלום (אופציונלי):</label>
+                    <textarea
+                      value={userNeeds}
+                      onChange={(e) => setUserNeeds(e.target.value)}
+                      placeholder="לדוגמה: בית מדברי מואר ברתמים עם הגנה מסופות חול צפון-מערביות..."
+                      className="w-full h-14 p-2 border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 bg-desert-50 text-xs resize-none"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <div className="bg-desert-50 text-desert-800 p-2 border border-desert-200 rounded-lg text-[10px] h-16 overflow-y-auto font-mono scrollbar-thin" dir="ltr">
+                      {generatedPrompt}
+                    </div>
+                    <button
+                      onClick={handleCopyPrompt}
+                      className="absolute top-2 right-2 bg-white/95 p-1 rounded border border-desert-200 shadow-xs hover:bg-desert-100 text-desert-700 transition-colors"
+                      title="העתק פרומפט"
+                    >
+                      {copySuccess ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-desert-700 mb-1">2. הדבק את תיאור התכנון מה-AI:</label>
+                    <textarea
+                      className="w-full h-24 p-2.5 border border-desert-300 rounded-lg focus:ring-2 focus:ring-terracotta-400 bg-desert-50 text-xs font-mono"
+                      placeholder="הדבק כאן את תוצאת ה-AI (פסקה חופשית שמתארת העמדה, כיווני רוח והמלצות, או אובייקט JSON)..."
+                      value={aiResponse}
+                      onChange={(e) => setAiResponse(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleApplyAiText}
+                    className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                  >
+                    החל ונתח תכנון AI
+                  </button>
+                </div>
+              )}
+
+              {errorMsg && (
+                <div className="mt-3 bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded-lg flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+            </section>
+          </div>
+
+        </div>
+
+        {/* Middle Section: Visualizer & Controls side-by-side */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* Visual SVG Simulation (7 columns) */}
+          <div className="lg:col-span-7 flex flex-col">
+            <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200 flex flex-col h-full">
+              <div className="flex justify-between items-center mb-4 no-print">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-desert-800">
+                  <Compass className="w-5 h-5 text-terracotta-600" />
+                  הדמיית העמדה, רוח והצללה (2D)
+                </h2>
+                <button
+                  onClick={printWithCloneNode}
+                  className="text-xs bg-desert-800 hover:bg-desert-950 text-white font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <span>ייצא ל-PDF / הדפס</span>
+                </button>
+              </div>
+
+              {/* Print Header */}
+              <div className="print-only mb-6 pb-4 border-b border-desert-300 text-center">
+                <h1 className="text-2xl font-bold text-desert-900">דו&quot;ח העמדה ואדריכלות מדבר חכמה</h1>
+                <p className="text-xs text-desert-600 mt-1">
+                  הופק עבור מיקום: {locationName} ({latitude.toFixed(4)}°, {longitude.toFixed(4)}°) | זווית העמדה: {houseRotation}°
+                </p>
+              </div>
+
+              <Visualization2D />
+            </section>
+          </div>
+
+          {/* Manual Simulation Overrides & Fine-tuning (5 columns) */}
+          <div className="lg:col-span-5 flex flex-col no-print">
+            <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200 h-full">
+              <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-desert-800 border-b border-desert-100 pb-2">
+                <Sliders className="w-5 h-5 text-terracotta-600" />
+                בקרת סימולציה וכיוונון ידני
+              </h2>
+
+              <div className="space-y-4">
+                {/* House Rotation Slider */}
                 <div>
                   <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
-                    <span>עוצמת רוח:</span>
-                    <span className="font-mono text-terracotta-600 font-bold">{windSpeed} קשר</span>
+                    <span>זווית העמדת הבית (סיבוב):</span>
+                    <span className="font-mono text-terracotta-600 font-bold">{houseRotation}°</span>
                   </div>
                   <input
                     type="range"
                     min="0"
-                    max="30"
-                    value={windSpeed}
-                    onChange={(e) => setWindSpeed(parseInt(e.target.value, 10))}
+                    max="360"
+                    value={houseRotation}
+                    onChange={(e) => setHouseRotation(parseInt(e.target.value, 10))}
                     className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
                   />
+                  <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
+                    <span>0° (צפון)</span>
+                    <span>90° (מזרח)</span>
+                    <span>180° (דרום)</span>
+                    <span>270° (מערב)</span>
+                    <span>360°</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Building Height Selector */}
-              <div>
-                <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
-                  <span>גובה המבנה (קנה מידה של צל):</span>
-                  <span className="font-mono text-terracotta-600 font-bold">{buildingHeight} מ' ({(buildingHeight / 2.8).toFixed(0)} קומות)</span>
+                {/* House Zoom/Scale Slider */}
+                <div>
+                  <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
+                    <span>קנה מידה / הגדלת אלמנט הבית ב-2D:</span>
+                    <span className="font-mono text-terracotta-600 font-bold">{(houseZoom * 100).toFixed(0)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3.0"
+                    step="0.1"
+                    value={houseZoom}
+                    onChange={(e) => setHouseZoom(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
+                    <span>50%</span>
+                    <span>100% (ברירת מחדל)</span>
+                    <span>200%</span>
+                    <span>300% (הגדלה מקסימלית)</span>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="2.8"
-                  max="11.2"
-                  step="2.8"
-                  value={buildingHeight}
-                  onChange={(e) => setBuildingHeight(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
-                />
-                <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
-                  <span>2.8 מ' (קומה 1)</span>
-                  <span>5.6 מ' (2 קומות)</span>
-                  <span>8.4 מ' (3 קומות)</span>
-                  <span>11.2 מ' (4 קומות)</span>
+
+                {/* Month Selector */}
+                <div>
+                  <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
+                    <span>חודש בשנה (עונות):</span>
+                    <span className="text-terracotta-600 font-bold">חודש {selectedMonth} - {getHebrewMonthName(selectedMonth)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="12"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
+                    className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
+                    <span>ינואר (חורף)</span>
+                    <span>אפריל (אביב)</span>
+                    <span>יולי (קיץ)</span>
+                    <span>אוקטובר (סתיו)</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* House Corners Text Editor */}
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-desert-700 flex justify-between items-center">
-                  <span>פינות המבנה במטרים (נ"צ יחסיות):</span>
-                  <button 
-                    type="button"
-                    onClick={() => setHouseCorners([[0, 0], [12, 0], [12, 9], [0, 9]])}
-                    className="text-[10px] text-terracotta-600 hover:text-terracotta-800 font-bold underline cursor-pointer"
-                  >
-                    אפס למלבן ברירת מחדל
-                  </button>
-                </label>
-                <input
-                  type="text"
-                  value={cornersInputVal}
-                  onChange={handleCornersInputChange}
-                  placeholder="לדוגמה: (0,0), (12,0), (12,9), (0,9)"
-                  className="w-full p-2 border border-desert-300 rounded-lg focus:ring-2 focus:ring-terracotta-400 focus:border-terracotta-400 bg-desert-50 text-xs font-mono text-desert-800"
-                />
-                <p className="text-[10px] text-desert-500 leading-tight">
-                  הזן רשימת נקודות (x,y) במטרים. ניתן להזין צורות מורכבות (כגון L, חצר פנימית וכדומה).
-                </p>
-              </div>
+                {/* Hour of Day Slider */}
+                <div>
+                  <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
+                    <span>שעה ביום (00:00 - 24:00):</span>
+                    <span className="font-mono text-terracotta-600 font-bold">
+                      {hour.toString().padStart(2, '0')}:00
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="24"
+                    value={hour}
+                    onChange={(e) => setHour(parseInt(e.target.value, 10))}
+                    className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
+                    <span>חצות</span>
+                    <span>06:00 (זריחה)</span>
+                    <span>12:00 (צהריים)</span>
+                    <span>18:00 (שקיעה)</span>
+                    <span>חצות</span>
+                  </div>
+                </div>
 
-              {/* Show Wind Checkbox */}
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="showWindCheck"
-                  checked={showWind}
-                  onChange={(e) => setShowWind(e.target.checked)}
-                  className="rounded text-terracotta-600 focus:ring-terracotta-500 h-4 w-4 border-desert-300"
-                />
-                <label htmlFor="showWindCheck" className="text-xs font-medium text-desert-700 cursor-pointer select-none">
-                  הצג זרמי רוח בהדמיה
-                </label>
-              </div>
+                {/* Wind Direction Selector */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-desert-700 mb-1">כיוון רוח נושבת:</label>
+                    <select
+                      value={windDirection}
+                      onChange={(e) => setWindDirection(e.target.value)}
+                      className="w-full p-2 border border-desert-300 rounded-lg focus:ring-1 focus:ring-terracotta-400 bg-desert-50 text-xs"
+                    >
+                      <option value="nw">צפון-מערבית (NW)</option>
+                      <option value="w">מערבית (W)</option>
+                      <option value="sw">דרום-מערבית (SW)</option>
+                      <option value="s">דרומית (S)</option>
+                      <option value="se">דרום-מזרחית (SE)</option>
+                      <option value="e">מזרחית (E)</option>
+                      <option value="ne">צפון-מזרחית (NE)</option>
+                      <option value="n">צפונית (N)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
+                      <span>עוצמת רוח:</span>
+                      <span className="font-mono text-terracotta-600 font-bold">{windSpeed} קשר</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="30"
+                      value={windSpeed}
+                      onChange={(e) => setWindSpeed(parseInt(e.target.value, 10))}
+                      className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
+                    />
+                  </div>
+                </div>
 
-            </div>
-          </section>
+                {/* Building Height Selector */}
+                <div>
+                  <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
+                    <span>גובה המבנה (קנה מידה של צל):</span>
+                    <span className="font-mono text-terracotta-600 font-bold">{buildingHeight} מ' ({(buildingHeight / 2.8).toFixed(0)} קומות)</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="2.8"
+                    max="11.2"
+                    step="2.8"
+                    value={buildingHeight}
+                    onChange={(e) => setBuildingHeight(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
+                    <span>2.8 מ' (קומה 1)</span>
+                    <span>5.6 מ' (2 קומות)</span>
+                    <span>8.4 מ' (3 קומות)</span>
+                    <span>11.2 מ' (4 קומות)</span>
+                  </div>
+                </div>
+
+                {/* House Corners Text Editor */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-desert-700 flex justify-between items-center">
+                    <span>פינות המבנה במטרים (נ"צ יחסיות):</span>
+                    <button 
+                      type="button"
+                      onClick={() => setHouseCorners([[0, 0], [12, 0], [12, 9], [0, 9]])}
+                      className="text-[10px] text-terracotta-600 hover:text-terracotta-800 font-bold underline cursor-pointer"
+                    >
+                      אפס למלבן ברירת מחדל
+                    </button>
+                  </label>
+                  <input
+                    type="text"
+                    value={cornersInputVal}
+                    onChange={handleCornersInputChange}
+                    placeholder="לדוגמה: (0,0), (12,0), (12,9), (0,9)"
+                    className="w-full p-2 border border-desert-300 rounded-lg focus:ring-2 focus:ring-terracotta-400 focus:border-terracotta-400 bg-desert-50 text-xs font-mono text-desert-800"
+                  />
+                  <p className="text-[10px] text-desert-500 leading-tight">
+                    הזן רשימת נקודות (x,y) במטרים. ניתן להזין צורות מורכבות (כגון L, חצר פנימית וכדומה).
+                  </p>
+                </div>
+
+                {/* Show Wind Checkbox */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="showWindCheck"
+                    checked={showWind}
+                    onChange={(e) => setShowWind(e.target.checked)}
+                    className="rounded text-terracotta-600 focus:ring-terracotta-500 h-4 w-4 border-desert-300"
+                  />
+                  <label htmlFor="showWindCheck" className="text-xs font-medium text-desert-700 cursor-pointer select-none">
+                    הצג זרמי רוח בהדמיה
+                  </label>
+                </div>
+
+              </div>
+            </section>
+          </div>
 
         </div>
 
-        {/* Main Simulation Panel & Recommendations (7 columns wide) */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          
-          {/* SVG Simulation */}
-          <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200 flex flex-col">
-            <div className="flex justify-between items-center mb-4 no-print">
-              <h2 className="text-lg font-bold flex items-center gap-2 text-desert-800">
-                <Compass className="w-5 h-5 text-terracotta-600" />
-                הדמיית העמדה, רוח והצללה (2D)
+        {/* Bottom Section: Recommendations */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-12">
+            <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200">
+              <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-desert-800 border-b border-desert-100 pb-2">
+                <BookOpen className="w-5 h-5 text-terracotta-600" />
+                ניתוח והמלצות לתכנון מדברי חכם
               </h2>
-              <button
-                onClick={printWithCloneNode}
-                className="text-xs bg-desert-800 hover:bg-desert-950 text-white font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5"
-              >
-                <span>ייצא ל-PDF / הדפס</span>
-              </button>
-            </div>
 
-            {/* Print Header */}
-            <div className="print-only mb-6 pb-4 border-b border-desert-300 text-center">
-              <h1 className="text-2xl font-bold text-desert-900">דו&quot;ח העמדה ואדריכלות מדבר חכמה</h1>
-              <p className="text-xs text-desert-600 mt-1">
-                הופק עבור מיקום: {locationName} ({latitude.toFixed(4)}°, {longitude.toFixed(4)}°) | זווית העמדה: {houseRotation}°
-              </p>
-            </div>
-
-            <Visualization2D />
-          </section>
-
-          {/* Recommendations and Analysis Output Panel */}
-          <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200">
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-desert-800 border-b border-desert-100 pb-2">
-              <BookOpen className="w-5 h-5 text-terracotta-600" />
-              ניתוח והמלצות לתכנון מדברי חכם
-            </h2>
-
-            {!analysisResult ? (
-              <div className="bg-desert-50 rounded-lg p-5 border border-desert-200 text-center">
-                <p className="text-sm text-desert-600 italic">
-                  הדבק תיאור תכנון מה-AI בתיבת הטקסט או בצע ניתוח אוטומטי כדי לראות את ההמלצות האדריכליות המפורטות.
-                </p>
-                <div className="mt-4 flex gap-4 justify-center text-xs text-desert-500">
-                  <span>✓ ניתוח כיווני פתחים</span>
-                  <span>✓ הגנות מרוח וסופות חול</span>
-                  <span>✓ ניצול הפרשי טמפרטורות</span>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                {/* recommendations list */}
-                <div>
-                  <h3 className="text-sm font-bold text-terracotta-700 mb-2 flex items-center gap-1.5">
-                    <span className="w-1.5 h-3 bg-terracotta-600 rounded-sm"></span>
-                    המלצות תכנון מרכזיות:
-                  </h3>
-                  <ul className="space-y-2">
-                    {analysisResult.recommendations?.map((rec, idx) => (
-                      <li key={idx} className="text-sm text-desert-800 bg-desert-50 p-2.5 rounded-lg border border-desert-100 leading-relaxed">
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* technical specs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-desert-50 p-4 rounded-xl border border-desert-200 text-xs text-desert-800">
-                  <div>
-                    <h4 className="font-bold text-desert-900 border-b border-desert-200 pb-1 mb-2">פרטי העמדה נוכחיים:</h4>
-                    <ul className="space-y-1.5">
-                      <li>
-                        <span className="font-medium text-desert-600">כיוון העמדה:</span> {analysisResult.layout?.orientation || 'מזרח-מערב'}
-                      </li>
-                      <li>
-                        <span className="font-medium text-desert-600">זווית סיבוב:</span> {houseRotation}°
-                      </li>
-                      <li>
-                        <span className="font-medium text-desert-600">מסלול שמש קיץ:</span> {analysisResult.layout?.sunPath?.summer || 'שמש גבוהה מעל המבנה'}
-                      </li>
-                      <li>
-                        <span className="font-medium text-desert-600">מסלול שמש חורף:</span> {analysisResult.layout?.sunPath?.winter || 'שמש נמוכה חודרת פתחים דרומיים'}
-                      </li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-desert-900 border-b border-desert-200 pb-1 mb-2">תנאי רוח והגנות:</h4>
-                    <ul className="space-y-1.5">
-                      <li>
-                        <span className="font-medium text-desert-600">כיוון רוח נושבת:</span> {windDirection.toUpperCase()}
-                      </li>
-                      <li>
-                        <span className="font-medium text-desert-600">אסטרטגיית הגנה:</span> {analysisResult.layout?.windProtection?.strategy || 'נטיעת עצים וקירות חוסמי חול'}
-                      </li>
-                    </ul>
+              {!analysisResult ? (
+                <div className="bg-desert-50 rounded-lg p-5 border border-desert-200 text-center">
+                  <p className="text-sm text-desert-600 italic">
+                    הדבק תיאור תכנון מה-AI בתיבת הטקסט או בצע ניתוח אוטומטי כדי לראות את ההמלצות האדריכליות המפורטות.
+                  </p>
+                  <div className="mt-4 flex gap-4 justify-center text-xs text-desert-500">
+                    <span>✓ ניתוח כיווני פתחים</span>
+                    <span>✓ הגנות מרוח וסופות חול</span>
+                    <span>✓ ניצול הפרשי טמפרטורות</span>
                   </div>
                 </div>
-              </div>
-            )}
-          </section>
+              ) : (
+                <div className="space-y-5">
+                  {/* recommendations list */}
+                  <div>
+                    <h3 className="text-sm font-bold text-terracotta-700 mb-2 flex items-center gap-1.5">
+                      <span className="w-1.5 h-3 bg-terracotta-600 rounded-sm"></span>
+                      המלצות תכנון מרכזיות:
+                    </h3>
+                    <ul className="space-y-2">
+                      {analysisResult.recommendations?.map((rec, idx) => (
+                        <li key={idx} className="text-sm text-desert-800 bg-desert-50 p-2.5 rounded-lg border border-desert-100 leading-relaxed">
+                          {rec}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
+                  {/* technical specs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-desert-50 p-4 rounded-xl border border-desert-200 text-xs text-desert-800">
+                    <div>
+                      <h4 className="font-bold text-desert-900 border-b border-desert-200 pb-1 mb-2">פרטי העמדה נוכחיים:</h4>
+                      <ul className="space-y-1.5">
+                        <li>
+                          <span className="font-medium text-desert-600">כיוון העמדה:</span> {analysisResult.layout?.orientation || 'מזרח-מערב'}
+                        </li>
+                        <li>
+                          <span className="font-medium text-desert-600">זווית סיבוב:</span> {houseRotation}°
+                        </li>
+                        <li>
+                          <span className="font-medium text-desert-600">מסלול שמש קיץ:</span> {analysisResult.layout?.sunPath?.summer || 'שמש גבוהה מעל המבנה'}
+                        </li>
+                        <li>
+                          <span className="font-medium text-desert-600">מסלול שמש חורף:</span> {analysisResult.layout?.sunPath?.winter || 'שמש נמוכה חודרת פתחים דרומיים'}
+                        </li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-desert-900 border-b border-desert-200 pb-1 mb-2">תנאי רוח והגנות:</h4>
+                      <ul className="space-y-1.5">
+                        <li>
+                          <span className="font-medium text-desert-600">כיוון רוח נושבת:</span> {windDirection.toUpperCase()}
+                        </li>
+                        <li>
+                          <span className="font-medium text-desert-600">אסטרטגיית הגנה:</span> {analysisResult.layout?.windProtection?.strategy || 'נטיעת עצים וקירות חוסמי חול'}
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
         </div>
 
       </main>
