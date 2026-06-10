@@ -79,6 +79,10 @@ const useStore = create((set) => ({
   // House footprint zoom factor
   houseZoom: 1.0,
   setHouseZoom: (zoom) => set({ houseZoom: zoom }),
+
+  // 2D schema canvas size in pixels (controls the rendered size of the whole SVG)
+  canvasSize: 380,
+  setCanvasSize: (size) => set({ canvasSize: size }),
 }));
 
 export default useStore;

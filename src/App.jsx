@@ -36,7 +36,8 @@ const App = () => {
     showWind, setShowWind,
     buildingHeight, setBuildingHeight,
     houseCorners, setHouseCorners,
-    houseZoom, setHouseZoom
+    houseZoom, setHouseZoom,
+    canvasSize, setCanvasSize
   } = useStore();
 
   const [copySuccess, setCopySuccess] = useState(false);
@@ -475,6 +476,28 @@ ${userNeeds}`;
                     <span>180° (דרום)</span>
                     <span>270° (מערב)</span>
                     <span>360°</span>
+                  </div>
+                </div>
+
+                {/* Canvas Size Slider */}
+                <div>
+                  <div className="flex justify-between text-xs font-medium text-desert-700 mb-1">
+                    <span>גודל הסכמה 2D:</span>
+                    <span className="font-mono text-terracotta-600 font-bold">{canvasSize}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="200"
+                    max="600"
+                    step="10"
+                    value={canvasSize}
+                    onChange={(e) => setCanvasSize(parseInt(e.target.value, 10))}
+                    className="w-full h-1.5 bg-desert-200 rounded-lg appearance-none cursor-pointer accent-terracotta-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-desert-500 px-1 mt-0.5">
+                    <span>קטן (200px)</span>
+                    <span>בינוני (400px)</span>
+                    <span>גדול (600px)</span>
                   </div>
                 </div>
 

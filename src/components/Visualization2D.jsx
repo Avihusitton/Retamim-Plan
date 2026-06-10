@@ -15,7 +15,8 @@ const Visualization2D = () => {
     showWind,
     buildingHeight,
     houseCorners,
-    houseZoom
+    houseZoom,
+    canvasSize
   } = useStore();
 
   // 1. Calculate Solar Position
@@ -202,8 +203,11 @@ const Visualization2D = () => {
         </div>
       </div>
 
-      {/* SVG Container */}
-      <div className="relative w-full max-w-[420px] aspect-square rounded-xl overflow-hidden bg-desert-50 border border-desert-200">
+      {/* SVG Container — width/height driven by canvasSize store value */}
+      <div
+        className="relative aspect-square rounded-xl overflow-hidden bg-desert-50 border border-desert-200 mx-auto"
+        style={{ width: canvasSize, height: canvasSize }}
+      >
         
         {/* Directions Labels */}
         <div className="absolute inset-0 pointer-events-none select-none text-xs font-bold text-desert-700 p-2">
