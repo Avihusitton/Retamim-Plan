@@ -14,6 +14,138 @@ import { generateMassing } from '../utils/buildingMassing';
 import { wgs84ToLocalMeters } from '../utils/coordsToMeters';
 import { getSunPosition } from '../utils/solarCalculator';
 
+// ─── Compass Texture Generation ─────────────────────────────────────────────
+const createCompassTexture = () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, 512, 512);
+
+  const cx = 256;
+  const cy = 256;
+  const r = 200;
+
+  // Outer circle
+  ctx.strokeStyle = '#8c765c';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.stroke();
+
+  // Inner circle
+  ctx.strokeStyle = '#a68c70';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 20, 0, 2 * Math.PI);
+  ctx.stroke();
+
+  // Tick marks
+  ctx.strokeStyle = '#8c765c';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 360; i += 15) {
+    const rad = (i * Math.PI) / 180;
+    const len = i % 90 === 0 ? 15 : i % 45 === 0 ? 10 : 5;
+    const x1 = cx + (r - 20) * Math.sin(rad);
+    const y1 = cy - (r - 20) * Math.cos(rad);
+    const x2 = cx + (r - 20 - len) * Math.sin(rad);
+    const y2 = cy - (r - 20 - len) * Math.cos(rad);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  // Draw Cardinal directions
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // N (North is top of canvas -> x=cx, y=cy - r + 45)
+  ctx.fillStyle = '#c85a32';
+  ctx.fillText('N', cx, cy - r + 45);
+
+  // S (South is bottom)
+  ctx.fillStyle = '#6e5842';
+  ctx.fillText('S', cx, cy + r - 45);
+
+  // E (East is right)
+  ctx.fillText('E', cx + r - 45, cy);
+
+  // W (West is left)
+  ctx.fillText('W', cx - r + 45, cy);
+
+  // Draw pointers
+  ctx.fillStyle = '#c85a32';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx - 15, cy);
+  ctx.lineTo(cx, cy - r + 70);
+  ctx.fill();
+
+  ctx.fillStyle = '#e57a53';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + 15, cy);
+  ctx.lineTo(cx, cy - r + 70);
+  ctx.fill();
+
+  ctx.fillStyle = '#5c4a37';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx - 12, cy);
+  ctx.lineTo(cx, cy + r - 70);
+  ctx.fill();
+
+  ctx.fillStyle = '#7a644e';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + 12, cy);
+  ctx.lineTo(cx, cy + r - 70);
+  ctx.fill();
+
+  ctx.fillStyle = '#69543f';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx, cy - 12);
+  ctx.lineTo(cx + r - 70, cy);
+  ctx.fill();
+
+  ctx.fillStyle = '#856e57';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx, cy + 12);
+  ctx.lineTo(cx + r - 70, cy);
+  ctx.fill();
+
+  ctx.fillStyle = '#544230';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx, cy - 12);
+  ctx.lineTo(cx - r + 70, cy);
+  ctx.fill();
+
+  ctx.fillStyle = '#6e5842';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx, cy + 12);
+  ctx.lineTo(cx - r + 70, cy);
+  ctx.fill();
+
+  // Center cap
+  ctx.fillStyle = '#ffd8a8';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 8, 0, 2 * Math.PI);
+  ctx.fill();
+
+  ctx.strokeStyle = '#8c765c';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  return new THREE.CanvasTexture(canvas);
+};
+
 // ─── Default values ─────────────────────────────────────────────────────────
 const DEFAULT_FOOTPRINT = '[[0,0],[10,0],[10,6],[0,6]]';
 const DEFAULT_HEIGHT    = 8;
@@ -126,6 +258,19 @@ const MassingImporter = () => {
     controls.dampingFactor = 0.08;
     controlsRef.current = controls;
 
+    // Compass rotating overlay logic
+    const updateOverlay = () => {
+      const camOffset = new THREE.Vector3().subVectors(camera.position, controls.target);
+      const angle = Math.atan2(camOffset.x, camOffset.z);
+      const deg = (angle * 180) / Math.PI;
+      const compassOverlay = document.getElementById('massing-compass-overlay');
+      if (compassOverlay) {
+        compassOverlay.style.transform = `rotate(${deg}deg)`;
+      }
+    };
+    controls.addEventListener('change', updateOverlay);
+    setTimeout(updateOverlay, 0);
+
     // Lighting
     const ambient = new THREE.AmbientLight(0xfff8f0, 0.6);
     scene.add(ambient);
@@ -156,6 +301,19 @@ const MassingImporter = () => {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
+
+    // Compass rose ground overlay
+    const compassTex = createCompassTexture();
+    const compassGeo = new THREE.PlaneGeometry(6, 6);
+    const compassMat = new THREE.MeshBasicMaterial({
+      map: compassTex,
+      transparent: true,
+      depthWrite: false,
+    });
+    const compassMesh = new THREE.Mesh(compassGeo, compassMat);
+    compassMesh.rotation.x = -Math.PI / 2;
+    compassMesh.position.set(0, 0.02, 0);
+    scene.add(compassMesh);
 
     // Grid helper (10m grid)
     const grid = new THREE.GridHelper(60, 60, '#c2a880', '#d4c4a8');
@@ -483,11 +641,34 @@ const MassingImporter = () => {
           </div>
 
           {/* Three.js Canvas */}
-          <div
-            ref={mountRef}
-            className="w-full rounded-xl overflow-hidden border border-desert-200 bg-desert-50"
-            style={{ height: 420 }}
-          />
+          <div className="relative w-full rounded-xl overflow-hidden border border-desert-200 bg-desert-50">
+            <div
+              ref={mountRef}
+              className="w-full"
+              style={{ height: 420 }}
+            />
+            {/* Compass Overlay in top-right */}
+            <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-1.5 rounded-full shadow-md border border-desert-200 flex items-center justify-center pointer-events-none z-10 select-none">
+              <div
+                id="massing-compass-overlay"
+                className="w-10 h-10 flex items-center justify-center"
+                style={{ transform: 'rotate(0deg)', transformOrigin: 'center' }}
+              >
+                <svg viewBox="0 0 100 100" className="w-10 h-10">
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="#8c765c" strokeWidth="4" />
+                  <circle cx="50" cy="50" r="38" fill="none" stroke="#a68c70" strokeWidth="1.5" />
+                  <text x="50" y="20" fontSize="16" fontWeight="bold" fill="#c85a32" textAnchor="middle">N</text>
+                  <text x="50" y="88" fontSize="14" fill="#6e5842" textAnchor="middle">S</text>
+                  <text x="84" y="55" fontSize="14" fill="#6e5842" textAnchor="middle">E</text>
+                  <text x="16" y="55" fontSize="14" fill="#6e5842" textAnchor="middle">W</text>
+                  <polygon points="50,50 45,50 50,22" fill="#c85a32" />
+                  <polygon points="50,50 55,50 50,22" fill="#e57a53" />
+                  <polygon points="50,50 46,50 50,78" fill="#5c4a37" />
+                  <polygon points="50,50 54,50 50,78" fill="#7a644e" />
+                </svg>
+              </div>
+            </div>
+          </div>
 
           {/* Controls hint */}
           <p className="text-[10px] text-desert-400 text-center">
