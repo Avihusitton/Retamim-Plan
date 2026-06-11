@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   Sun, Wind, Home, Settings, Map, BookOpen, Key, Copy, Check, 
   Bot, Compass, Globe, Sliders, AlertCircle, FileText, RotateCw 
@@ -8,6 +8,7 @@ import { systemPrompt, analyzeNeeds } from './services/aiService';
 import { parseAiText } from './utils/aiParser';
 import { getHebrewMonthName, getDayOfYearForMonth } from './utils/solarCalculator';
 import Visualization2D from './components/Visualization2D';
+const MassingImporter = lazy(() => import('./components/MassingImporter'));
 import { printWithCloneNode } from './utils/printUtils';
 
 const locationPresets = [
@@ -745,6 +746,15 @@ ${userNeeds}`;
               )}
             </section>
           </div>
+        </div>
+
+        {/* 3D Building Massing Section */}
+        <div className="grid grid-cols-1 gap-6">
+          <Suspense fallback={
+            <div className="bg-white rounded-xl border border-desert-200 p-5 text-center text-sm text-desert-500">טוען מחולל 3D…</div>
+          }>
+            <MassingImporter />
+          </Suspense>
         </div>
 
       </main>

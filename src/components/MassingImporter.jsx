@@ -1,0 +1,327 @@
+/**
+ * MassingImporter.jsx
+ * -------------------
+ * Collapsible panel that accepts a JSON footprint + height,
+ * generates a 3D extruded massing mesh, and renders it in an
+ * embedded Three.js canvas — fully client-side, no backend.
+ */
+
+import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Building2, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from 'lucide-react';
+import { generateMassing } from '../utils/buildingMassing';
+
+// ─── Default values ─────────────────────────────────────────────────────────
+const DEFAULT_FOOTPRINT = '[[0,0],[10,0],[10,6],[0,6]]';
+const DEFAULT_HEIGHT    = 8;
+
+// ─── Component ───────────────────────────────────────────────────────────────
+const MassingImporter = () => {
+  // Panel open/closed
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Form state
+  const [footprintJson, setFootprintJson] = useState(DEFAULT_FOOTPRINT);
+  const [height,        setHeight]        = useState(DEFAULT_HEIGHT);
+  const [error,         setError]         = useState('');
+  const [bbInfo,        setBbInfo]        = useState(null);  // { width, depth, height }
+
+  // Three.js refs
+  const mountRef    = useRef(null);
+  const sceneRef    = useRef(null);
+  const cameraRef   = useRef(null);
+  const rendererRef = useRef(null);
+  const controlsRef = useRef(null);
+  const meshRef     = useRef(null);
+  const rafRef      = useRef(null);
+
+  // ── Initialize Three.js scene ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!isOpen) return; // don't create renderer until panel is open
+
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#f7f4ee');
+    sceneRef.current = scene;
+
+    // Camera
+    const w = mount.clientWidth;
+    const h = mount.clientHeight;
+    const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 1000);
+    camera.position.set(15, 12, 18);
+    camera.lookAt(5, 0, 3);
+    cameraRef.current = camera;
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(w, h);
+    renderer.shadowMap.enabled  = true;
+    renderer.shadowMap.type     = THREE.PCFSoftShadowMap;
+    mount.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    // Orbit Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controlsRef.current = controls;
+
+    // Lighting
+    const ambient = new THREE.AmbientLight(0xfff8f0, 0.6);
+    scene.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xfff3cc, 1.4);
+    sun.position.set(20, 30, 10);
+    sun.castShadow    = true;
+    sun.shadow.mapSize.width  = 1024;
+    sun.shadow.mapSize.height = 1024;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far  = 100;
+    sun.shadow.camera.left = sun.shadow.camera.bottom = -30;
+    sun.shadow.camera.right = sun.shadow.camera.top   =  30;
+    scene.add(sun);
+
+    // Ground plane
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(60, 60),
+      new THREE.MeshStandardMaterial({ color: '#e6d8c0', roughness: 0.9 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Grid helper (10m grid)
+    const grid = new THREE.GridHelper(60, 60, '#c2a880', '#d4c4a8');
+    grid.position.y = 0.01;
+    scene.add(grid);
+
+    // Axes helper (X=red, Y=green, Z=blue)
+    scene.add(new THREE.AxesHelper(5));
+
+    // Animate loop
+    const animate = () => {
+      rafRef.current = requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    // Resize observer
+    const ro = new ResizeObserver(() => {
+      const w2 = mount.clientWidth;
+      const h2 = mount.clientHeight;
+      camera.aspect = w2 / h2;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w2, h2);
+    });
+    ro.observe(mount);
+
+    // Auto-generate with default values on first open
+    handleGenerate(scene);
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(rafRef.current);
+      renderer.dispose();
+      if (mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // ── Generate / replace mesh ────────────────────────────────────────────────
+  const handleGenerate = (scene) => {
+    setError('');
+    const targetScene = scene || sceneRef.current;
+    if (!targetScene) return;
+
+    // Parse footprint
+    let points;
+    try {
+      points = JSON.parse(footprintJson);
+      if (!Array.isArray(points) || points.length < 3) throw new Error();
+      for (const p of points) {
+        if (!Array.isArray(p) || p.length < 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number') {
+          throw new Error();
+        }
+      }
+    } catch {
+      setError('שגיאה: יש להזין מערך JSON תקין, לדוגמה: [[0,0],[10,0],[10,6],[0,6]]');
+      return;
+    }
+
+    const h = parseFloat(height);
+    if (isNaN(h) || h <= 0 || h > 100) {
+      setError('שגיאה: גובה חייב להיות מספר בין 1 ל-100');
+      return;
+    }
+
+    // Remove old mesh
+    if (meshRef.current) {
+      targetScene.remove(meshRef.current);
+      meshRef.current.geometry.dispose();
+      meshRef.current.material.dispose();
+      meshRef.current = null;
+    }
+
+    // Generate new geometry
+    let geometry;
+    try {
+      geometry = generateMassing(points, h);
+    } catch (err) {
+      setError(`שגיאה ביצירת הגאומטריה: ${err.message}`);
+      return;
+    }
+
+    // Read bounding box (already computed inside generateMassing)
+    const bb     = geometry.boundingBox;
+    const width  = parseFloat((bb.max.x - bb.min.x).toFixed(2));
+    const bbH    = parseFloat((bb.max.y - bb.min.y).toFixed(2));
+    const depth  = parseFloat((bb.max.z - bb.min.z).toFixed(2));
+    setBbInfo({ width, height: bbH, depth });
+
+    // Create mesh
+    const material = new THREE.MeshStandardMaterial({
+      color:     0xaaaaaa,
+      roughness: 0.7,
+      metalness: 0.05,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow    = true;
+    mesh.receiveShadow = true;
+
+    // Center footprint on XZ origin and sit on Y=0
+    geometry.computeBoundingBox();
+    const center = new THREE.Vector3();
+    geometry.boundingBox.getCenter(center);
+    mesh.position.set(-center.x, -bb.min.y, -center.z);
+
+    targetScene.add(mesh);
+    meshRef.current = mesh;
+
+    // Reposition camera to frame the building nicely
+    if (cameraRef.current && controlsRef.current) {
+      const maxDim = Math.max(width, depth, bbH);
+      cameraRef.current.position.set(maxDim * 1.5, maxDim, maxDim * 1.8);
+      controlsRef.current.target.set(0, bbH / 2, 0);
+      controlsRef.current.update();
+    }
+  };
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+  return (
+    <section className="bg-white rounded-xl shadow-sm border border-desert-200 overflow-hidden">
+
+      {/* Header / Toggle */}
+      <button
+        onClick={() => setIsOpen(prev => !prev)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-desert-50 transition-colors"
+      >
+        <div className="flex items-center gap-2 text-desert-800">
+          <Building2 className="w-5 h-5 text-terracotta-600" />
+          <h2 className="text-lg font-bold">מחולל מסה תלת-ממדי (Building Massing 3D)</h2>
+        </div>
+        {isOpen
+          ? <ChevronUp   className="w-5 h-5 text-desert-500" />
+          : <ChevronDown className="w-5 h-5 text-desert-500" />
+        }
+      </button>
+
+      {/* Collapsible body */}
+      {isOpen && (
+        <div className="p-5 border-t border-desert-100 flex flex-col gap-4">
+
+          {/* Form row */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+
+            {/* Footprint JSON */}
+            <div className="md:col-span-7">
+              <label className="block text-xs font-semibold text-desert-700 mb-1">
+                נקודות בסיס (JSON) — מטרים:
+              </label>
+              <textarea
+                rows={3}
+                value={footprintJson}
+                onChange={e => setFootprintJson(e.target.value)}
+                className="w-full p-2.5 border border-desert-300 rounded-lg text-xs font-mono bg-desert-50 focus:ring-2 focus:ring-terracotta-400 resize-none"
+                placeholder='[[0,0],[10,0],[10,6],[0,6]]'
+              />
+              <p className="text-[10px] text-desert-500 mt-0.5">
+                הזן מערך JSON של נקודות [x, y] במטרים. לפחות 3 נקודות.
+              </p>
+            </div>
+
+            {/* Height + button */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-desert-700 mb-1">
+                גובה (מטרים):
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={height}
+                onChange={e => setHeight(e.target.value)}
+                className="w-full p-2.5 border border-desert-300 rounded-lg text-sm font-mono bg-desert-50 focus:ring-2 focus:ring-terracotta-400"
+              />
+            </div>
+
+            <div className="md:col-span-3">
+              <button
+                onClick={() => handleGenerate(null)}
+                className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <RefreshCw className="w-4 h-4" />
+                הפק מסה תלת-ממדית
+              </button>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs p-2.5 rounded-lg">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Bounding box info */}
+          {bbInfo && !error && (
+            <div className="flex gap-4 text-xs text-desert-700 bg-desert-50 px-4 py-2 rounded-lg border border-desert-200">
+              <span>📐 <strong>רוחב:</strong> {bbInfo.width} מ'</span>
+              <span>📐 <strong>עומק:</strong> {bbInfo.depth} מ'</span>
+              <span>📏 <strong>גובה:</strong> {bbInfo.height} מ'</span>
+              <span className="text-desert-400">| ✓ 1 יחידה = 1 מטר</span>
+            </div>
+          )}
+
+          {/* Three.js Canvas */}
+          <div
+            ref={mountRef}
+            className="w-full rounded-xl overflow-hidden border border-desert-200 bg-desert-50"
+            style={{ height: 420 }}
+          />
+
+          {/* Controls hint */}
+          <p className="text-[10px] text-desert-400 text-center">
+            🖱 גרור לסיבוב · Scroll להתקרבות / התרחקות · לחיצה ימנית להזזה
+          </p>
+
+          {/* Disclaimer per AGENTS.md domain rule */}
+          <p className="text-[10px] text-desert-500 text-center italic border-t border-desert-100 pt-2">
+            כלי זה אינו תחליף לייעוץ אדריכלי או הנדסי מקצועי
+          </p>
+
+        </div>
+      )}
+    </section>
+  );
+};
+
+export default MassingImporter;
