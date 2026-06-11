@@ -9,8 +9,9 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Building2, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from 'lucide-react';
+import { Building2, ChevronDown, ChevronUp, RefreshCw, AlertCircle, ArrowDownToLine } from 'lucide-react';
 import { generateMassing } from '../utils/buildingMassing';
+import { wgs84ToLocalMeters } from '../utils/coordsToMeters';
 
 // ─── Default values ─────────────────────────────────────────────────────────
 const DEFAULT_FOOTPRINT = '[[0,0],[10,0],[10,6],[0,6]]';
@@ -26,6 +27,10 @@ const MassingImporter = () => {
   const [height,        setHeight]        = useState(DEFAULT_HEIGHT);
   const [error,         setError]         = useState('');
   const [bbInfo,        setBbInfo]        = useState(null);  // { width, depth, height }
+
+  // WGS84 converter state
+  const [wgs84Input, setWgs84Input] = useState('');
+  const [wgs84Error, setWgs84Error] = useState('');
 
   // Three.js refs
   const mountRef    = useRef(null);
@@ -135,6 +140,30 @@ const MassingImporter = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
+  // ── WGS84 → metres converter ───────────────────────────────────────────────
+  const handleWgs84Convert = () => {
+    setWgs84Error('');
+    let parsed;
+    try {
+      parsed = JSON.parse(wgs84Input);
+      if (!Array.isArray(parsed) || parsed.length < 2) throw new Error();
+      for (const p of parsed) {
+        if (!Array.isArray(p) || p.length < 2 ||
+            typeof p[0] !== 'number' || typeof p[1] !== 'number') throw new Error();
+      }
+    } catch {
+      setWgs84Error('שגיאה: הזן מערך JSON תקין של [[lon,lat], ...] לפחות 2 נקודות');
+      return;
+    }
+    try {
+      const meters = wgs84ToLocalMeters(parsed);
+      setFootprintJson(JSON.stringify(meters));
+      console.log('[coordsToMeters] WGS84 → metres:', meters);
+    } catch (err) {
+      setWgs84Error(`שגיאת המרה: ${err.message}`);
+    }
+  };
+
   // ── Generate / replace mesh ────────────────────────────────────────────────
   const handleGenerate = (scene) => {
     setError('');
@@ -236,6 +265,43 @@ const MassingImporter = () => {
       {/* Collapsible body */}
       {isOpen && (
         <div className="p-5 border-t border-desert-100 flex flex-col gap-4">
+
+          {/* ── WGS84 Converter (optional helper) ── */}
+          <div className="bg-desert-50 border border-desert-200 rounded-xl p-4 flex flex-col gap-3">
+            <p className="text-xs font-semibold text-desert-700">
+              🌐 המרת קואורדינטות WGS84 → מטרים <span className="font-normal text-desert-500">(אופציונלי)</span>
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div className="md:col-span-9">
+                <label className="block text-xs text-desert-600 mb-1">הדבק קואורדינטות WGS84 (אופציונלי):</label>
+                <textarea
+                  rows={3}
+                  value={wgs84Input}
+                  onChange={e => setWgs84Input(e.target.value)}
+                  className="w-full p-2.5 border border-desert-300 rounded-lg text-xs font-mono bg-white focus:ring-2 focus:ring-terracotta-400 resize-none"
+                  placeholder='[[34.694, 31.054], [34.695, 31.053], ...]'
+                />
+              </div>
+              <div className="md:col-span-3">
+                <button
+                  onClick={handleWgs84Convert}
+                  className="w-full bg-desert-700 hover:bg-desert-900 text-white font-semibold py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-xs"
+                >
+                  <ArrowDownToLine className="w-4 h-4" />
+                  המר למטרים
+                </button>
+              </div>
+            </div>
+            {wgs84Error && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded-lg">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{wgs84Error}</span>
+              </div>
+            )}
+            <p className="text-[10px] text-desert-400">
+              הנקודה הראשונה תהפוך לנקודת ייחוס [0,0]. הקואורדינטות יועברו אוטומטית לשדה הבסיס שלמטה.
+            </p>
+          </div>
 
           {/* Form row */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
