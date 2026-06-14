@@ -13,6 +13,7 @@ import { Building2, ChevronDown, ChevronUp, RefreshCw, AlertCircle, ArrowDownToL
 import { generateMassing } from '../utils/buildingMassing';
 import { wgs84ToLocalMeters } from '../utils/coordsToMeters';
 import { getSunPosition } from '../utils/solarCalculator';
+import { createPlotGround } from '../utils/plotGround';
 
 // ─── Compass Texture Generation ─────────────────────────────────────────────
 const createCompassTexture = () => {
@@ -153,7 +154,7 @@ const DEFAULT_HEIGHT    = 8;
 // ─── Component ───────────────────────────────────────────────────────────────
 const MassingImporter = () => {
   // Panel open/closed
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   // Form state
   const [footprintJson, setFootprintJson] = useState(DEFAULT_FOOTPRINT);
@@ -293,14 +294,8 @@ const MassingImporter = () => {
     // Set initial position
     updateSunPosition(selectedDate, selectedHour, sun);
 
-    // Ground plane
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(60, 60),
-      new THREE.MeshStandardMaterial({ color: '#e6d8c0', roughness: 0.9 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    // Ground plane, plot fills, street and sidewalks
+    createPlotGround(scene);
 
     // Compass rose ground overlay
     const compassTex = createCompassTexture();
@@ -360,6 +355,22 @@ const MassingImporter = () => {
     updateSunPosition(selectedDate, selectedHour);
   }, [selectedDate, selectedHour, isOpen]);
 
+  // Listen for custom event 'generate-3d-massing' to generate geometry from 2D clicks
+  useEffect(() => {
+    const handleCustomGenerate = (e) => {
+      const { footprint, height: newHeight } = e.detail;
+      const jsonStr = JSON.stringify(footprint);
+      setFootprintJson(jsonStr);
+      if (newHeight) setHeight(newHeight);
+      
+      handleGenerate(sceneRef.current, footprint, newHeight || height);
+    };
+    window.addEventListener('generate-3d-massing', handleCustomGenerate);
+    return () => {
+      window.removeEventListener('generate-3d-massing', handleCustomGenerate);
+    };
+  }, [footprintJson, height]);
+
   // ── WGS84 → metres converter ───────────────────────────────────────────────
   const handleWgs84Convert = () => {
     setWgs84Error('');
@@ -385,27 +396,42 @@ const MassingImporter = () => {
   };
 
   // ── Generate / replace mesh ────────────────────────────────────────────────
-  const handleGenerate = (scene) => {
+  const handleGenerate = (scene, footprintOverride, heightOverride) => {
     setError('');
     const targetScene = scene || sceneRef.current;
     if (!targetScene) return;
 
     // Parse footprint
     let points;
-    try {
-      points = JSON.parse(footprintJson);
-      if (!Array.isArray(points) || points.length < 3) throw new Error();
-      for (const p of points) {
-        if (!Array.isArray(p) || p.length < 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number') {
-          throw new Error();
-        }
+    const rawFootprint = footprintOverride !== undefined ? footprintOverride : footprintJson;
+    const rawHeight = heightOverride !== undefined ? heightOverride : height;
+
+    if (typeof rawFootprint === 'string') {
+      try {
+        points = JSON.parse(rawFootprint);
+      } catch {
+        setError('שגיאה: יש להזין מערך JSON תקין, לדוגמה: [[0,0],[10,0],[10,6],[0,6]]');
+        return;
       }
-    } catch {
-      setError('שגיאה: יש להזין מערך JSON תקין, לדוגמה: [[0,0],[10,0],[10,6],[0,6]]');
+    } else if (Array.isArray(rawFootprint)) {
+      points = rawFootprint;
+    } else {
+      setError('שגיאה: פורמט נקודות לא תקין');
       return;
     }
 
-    const h = parseFloat(height);
+    if (!Array.isArray(points) || points.length < 3) {
+      setError('שגיאה: נדרשות לפחות 3 נקודות');
+      return;
+    }
+    for (const p of points) {
+      if (!Array.isArray(p) || p.length < 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number') {
+        setError('שגיאה: פורמט נקודות לא תקין');
+        return;
+      }
+    }
+
+    const h = parseFloat(rawHeight);
     if (isNaN(h) || h <= 0 || h > 100) {
       setError('שגיאה: גובה חייב להיות מספר בין 1 ל-100');
       return;
@@ -467,24 +493,15 @@ const MassingImporter = () => {
   return (
     <section className="bg-white rounded-xl shadow-sm border border-desert-200 overflow-hidden">
 
-      {/* Header / Toggle */}
-      <button
-        onClick={() => setIsOpen(prev => !prev)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-desert-50 transition-colors"
-      >
+      {/* Header (Always Open) */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-desert-100 bg-desert-50">
         <div className="flex items-center gap-2 text-desert-800">
           <Building2 className="w-5 h-5 text-terracotta-600" />
           <h2 className="text-lg font-bold">מחולל מסה תלת-ממדי (Building Massing 3D)</h2>
         </div>
-        {isOpen
-          ? <ChevronUp   className="w-5 h-5 text-desert-500" />
-          : <ChevronDown className="w-5 h-5 text-desert-500" />
-        }
-      </button>
+      </div>
 
-      {/* Collapsible body */}
-      {isOpen && (
-        <div className="p-5 border-t border-desert-100 flex flex-col gap-4">
+      <div className="p-5 flex flex-col gap-4">
 
           {/* ── WGS84 Converter (optional helper) ── */}
           <div className="bg-desert-50 border border-desert-200 rounded-xl p-4 flex flex-col gap-3">
@@ -681,7 +698,6 @@ const MassingImporter = () => {
           </p>
 
         </div>
-      )}
     </section>
   );
 };

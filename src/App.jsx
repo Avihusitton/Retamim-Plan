@@ -44,6 +44,7 @@ const App = () => {
   const [copySuccess, setCopySuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [selectedPreset, setSelectedPreset] = useState('רתמים');
+  const [is2DPanelMinimized, setIs2DPanelMinimized] = useState(true);
   
   // Track selected month (1-12) locally to map to day of the year
   const [selectedMonth, setSelectedMonth] = useState(6); // June default
@@ -420,32 +421,13 @@ ${userNeeds}`;
         {/* Middle Section: Visualizer & Controls side-by-side */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* Visual SVG Simulation (7 columns) */}
+          {/* Visual 3D Massing Simulation (7 columns) */}
           <div className="lg:col-span-7 flex flex-col">
-            <section className="bg-white p-5 rounded-xl shadow-sm border border-desert-200 flex flex-col h-full">
-              <div className="flex justify-between items-center mb-4 no-print">
-                <h2 className="text-lg font-bold flex items-center gap-2 text-desert-800">
-                  <Compass className="w-5 h-5 text-terracotta-600" />
-                  הדמיית העמדה, רוח והצללה (2D)
-                </h2>
-                <button
-                  onClick={printWithCloneNode}
-                  className="text-xs bg-desert-800 hover:bg-desert-950 text-white font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5"
-                >
-                  <span>ייצא ל-PDF / הדפס</span>
-                </button>
-              </div>
-
-              {/* Print Header */}
-              <div className="print-only mb-6 pb-4 border-b border-desert-300 text-center">
-                <h1 className="text-2xl font-bold text-desert-900">דו&quot;ח העמדה ואדריכלות מדבר חכמה</h1>
-                <p className="text-xs text-desert-600 mt-1">
-                  הופק עבור מיקום: {locationName} ({latitude.toFixed(4)}°, {longitude.toFixed(4)}°) | זווית העמדה: {houseRotation}°
-                </p>
-              </div>
-
-              <Visualization2D />
-            </section>
+            <Suspense fallback={
+              <div className="bg-white rounded-xl border border-desert-200 p-5 text-center text-sm text-desert-500">טוען מחולל 3D…</div>
+            }>
+              <MassingImporter />
+            </Suspense>
           </div>
 
           {/* Manual Simulation Overrides & Fine-tuning (5 columns) */}
@@ -748,13 +730,57 @@ ${userNeeds}`;
           </div>
         </div>
 
-        {/* 3D Building Massing Section */}
-        <div className="grid grid-cols-1 gap-6">
-          <Suspense fallback={
-            <div className="bg-white rounded-xl border border-desert-200 p-5 text-center text-sm text-desert-500">טוען מחולל 3D…</div>
-          }>
-            <MassingImporter />
-          </Suspense>
+        {/* Floating 2D Visualization Panel */}
+        <div 
+          className="fixed bottom-4 left-4 z-50 bg-white rounded-xl shadow-2xl border border-desert-300 overflow-hidden transition-all duration-300 ease-in-out flex flex-col no-print"
+          style={{
+            width: is2DPanelMinimized ? '260px' : '430px',
+          }}
+        >
+          {/* Panel Header */}
+          <div 
+            className="bg-desert-800 text-desert-100 px-4 py-3 flex justify-between items-center cursor-pointer select-none"
+            onClick={() => setIs2DPanelMinimized(!is2DPanelMinimized)}
+          >
+            <span className="font-bold text-sm flex items-center gap-1.5">
+              <Compass className="w-4 h-4 text-terracotta-400" />
+              תצוגה דו-ממדית {is2DPanelMinimized ? '↗' : '↙'}
+            </span>
+            <div className="flex items-center gap-2">
+              {!is2DPanelMinimized && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    printWithCloneNode();
+                  }}
+                  className="text-[10px] bg-desert-700 hover:bg-desert-600 text-white font-medium py-1 px-2 rounded transition-colors"
+                >
+                  הדפס / PDF
+                </button>
+              )}
+              <button 
+                type="button"
+                className="text-xs hover:text-white bg-desert-700 hover:bg-desert-600 px-2 py-0.5 rounded transition-colors"
+              >
+                {is2DPanelMinimized ? 'הגדל' : 'מזער'}
+              </button>
+            </div>
+          </div>
+
+          {/* Panel Body */}
+          {!is2DPanelMinimized && (
+            <div className="p-4 overflow-y-auto max-h-[500px] flex-grow bg-white flex flex-col items-center">
+              {/* Print Header */}
+              <div className="print-only mb-6 pb-4 border-b border-desert-300 text-center w-full">
+                <h1 className="text-2xl font-bold text-desert-900">דו&quot;ח העמדה ואדריכלות מדבר חכמה</h1>
+                <p className="text-xs text-desert-600 mt-1">
+                  הופק עבור מיקום: {locationName} ({latitude.toFixed(4)}°, {longitude.toFixed(4)}°) | זווית העמדה: {houseRotation}°
+                </p>
+              </div>
+              <Visualization2D />
+            </div>
+          )}
         </div>
 
       </main>

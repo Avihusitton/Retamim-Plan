@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import useStore from '../store/useStore';
 import { getSunPosition } from '../utils/solarCalculator';
 
@@ -15,9 +15,13 @@ const Visualization2D = () => {
     showWind,
     buildingHeight,
     houseCorners,
+    setHouseCorners,
     houseZoom,
     canvasSize
   } = useStore();
+
+  const [isMarkingMode, setIsMarkingMode] = useState(false);
+  const [markedPoints, setMarkedPoints] = useState([]);
 
   // 1. Calculate Solar Position
   const sunPos = getSunPosition(latitude, dayOfYear, hour);
@@ -32,18 +36,90 @@ const Visualization2D = () => {
     ? windMap[windDirection.toLowerCase()] 
     : 315;
 
-  // 3. Coordinate conversions for the Sun in polar view
-  // Center of SVG is (200, 200). Outer horizon circle radius is 150.
+  // 3. SVG center
   const cx = 200;
   const cy = 200;
-  const horizonRadius = 150;
+  const horizonRadius = 150; // kept for solar path rendering
 
-  // Compute sun position coordinates in SVG space
+  // Plot corners in meters [x=East+, y=North+] — from plotGround.js
+  // Street is on the EAST side (positive x)
+  const PLOT_CORNERS_M = [
+    [5.65,  17.54],
+    [9.32,   8.05],
+    [11.24,  0.43],
+    [12.70, -10.75],
+    [-17.64,-17.30],
+    [-21.25,  2.05],
+  ];
+  // Street setback = 5m (east), neighbour setback = 3m (all others)
+  const STREET_SETBACK = 5;
+  const NEIGHBOUR_SETBACK = 3;
+
+  // Compute bounding box of plot for scaling
+  const plotXs = PLOT_CORNERS_M.map(p => p[0]);
+  const plotYs = PLOT_CORNERS_M.map(p => p[1]);
+  const plotMinX = Math.min(...plotXs);
+  const plotMaxX = Math.max(...plotXs);
+  const plotMinY = Math.min(...plotYs);
+  const plotMaxY = Math.max(...plotYs);
+  const plotW = plotMaxX - plotMinX;
+  const plotH = plotMaxY - plotMinY;
+  // Scale so plot fills ~320px with 40px margin each side
+  const PLOT_SVG_SIZE = 320;
+  const plotScale = PLOT_SVG_SIZE / Math.max(plotW, plotH);
+  const plotOffX = cx - ((plotMinX + plotMaxX) / 2) * plotScale;
+  // Y axis: North=up → invert y
+  const plotOffY = cy + ((plotMinY + plotMaxY) / 2) * plotScale;
+
+  // Convert plot meter coords to SVG coords
+  const mToSvg = (mx, my) => ([
+    plotOffX + mx * plotScale,
+    plotOffY - my * plotScale   // invert Y so North is up
+  ]);
+
+  // SVG polygon points string for the plot boundary
+  const plotSvgPoints = PLOT_CORNERS_M.map(([mx, my]) => mToSvg(mx, my).map(v => v.toFixed(1)).join(',')).join(' ');
+
+  // Setback polygon: shrink each edge inward
+  // Simple uniform offset using centroid-based shrink per vertex
+  const plotCentroidX = PLOT_CORNERS_M.reduce((s,p)=>s+p[0],0)/PLOT_CORNERS_M.length;
+  const plotCentroidY = PLOT_CORNERS_M.reduce((s,p)=>s+p[1],0)/PLOT_CORNERS_M.length;
+
+  // For each vertex, determine setback distance based on proximity to east (street)
+  // East boundary: vertices with x close to plotMaxX get 5m setback, others 3m
+  // We compute per-edge normals and offset inward
+  const n = PLOT_CORNERS_M.length;
+  const setbackCorners = PLOT_CORNERS_M.map((pt, i) => {
+    const prev = PLOT_CORNERS_M[(i - 1 + n) % n];
+    const next = PLOT_CORNERS_M[(i + 1) % n];
+    // Edge vectors
+    const e1x = pt[0] - prev[0]; const e1y = pt[1] - prev[1];
+    const e2x = next[0] - pt[0]; const e2y = next[1] - pt[1];
+    // Inward normals (rotate 90° toward centroid)
+    const len1 = Math.hypot(e1x, e1y) || 1;
+    const len2 = Math.hypot(e2x, e2y) || 1;
+    // Normal of edge1 (left-hand inward for CCW polygon)
+    const n1x = e1y / len1; const n1y = -e1x / len1;
+    const n2x = e2y / len2; const n2y = -e2x / len2;
+    // Bisector
+    let bx = n1x + n2x; let by = n1y + n2y;
+    const bl = Math.hypot(bx, by) || 1;
+    bx /= bl; by /= bl;
+    // Setback distance: east-facing vertices → 5m, others → 3m
+    const isEastFacing = pt[0] > plotCentroidX + (plotW * 0.2);
+    const dist = isEastFacing ? STREET_SETBACK : NEIGHBOUR_SETBACK;
+    return [pt[0] + bx * dist, pt[1] + by * dist];
+  });
+  const setbackSvgPoints = setbackCorners.map(([mx, my]) => mToSvg(mx, my).map(v => v.toFixed(1)).join(',')).join(' ');
+
+  // Street edge line on east side — from northmost to southmost east vertex
+  const eastVerts = [...PLOT_CORNERS_M].sort((a,b)=>b[0]-a[0]).slice(0,2);
+  const streetLineStart = mToSvg(eastVerts[0][0] + 2, eastVerts[0][1]);
+  const streetLineEnd   = mToSvg(eastVerts[1][0] + 2, eastVerts[1][1]);
+
+  // Compute sun position coordinates in SVG space (polar, centered on cx,cy)
   const getSvgCoords = (az, elev) => {
-    // Distance from center: zenith (90 deg) is 0, horizon (0 deg) is horizonRadius
-    // Below horizon, we clamp distance at horizonRadius
     const dist = horizonRadius * (1 - Math.max(0, elev) / 90);
-    // Azimuth: 0 is North (-Y), 90 is East (+X), 180 is South (+Y), 270 is West (-X)
     const rad = (az - 90) * Math.PI / 180;
     return {
       x: cx + dist * Math.cos(rad),
@@ -97,6 +173,50 @@ const Visualization2D = () => {
   const maxFootprintDim = Math.max(footprintWidth, footprintHeight);
   const scale = (maxFootprintDim > 0 ? 120 / maxFootprintDim : (80 / 12)) * houseZoom;
 
+  const handleSvgClick = (e) => {
+    if (!isMarkingMode) return;
+    const svgElement = e.currentTarget;
+    const rect = svgElement.getBoundingClientRect();
+    const clickX = ((e.clientX - rect.left) / rect.width) * 400;
+    const clickY = ((e.clientY - rect.top) / rect.height) * 400;
+    setMarkedPoints(prev => [...prev, [clickX, clickY]]);
+  };
+
+  const handleGenerate3D = () => {
+    if (markedPoints.length < 3) return;
+
+    const rRad = (houseRotation * Math.PI) / 180;
+    
+    const converted = markedPoints.map(([px, py]) => {
+      const rx = (px - cx) / scale;
+      const ry = (py - cy) / scale;
+      const x = rx * Math.cos(rRad) + ry * Math.sin(rRad);
+      const y = -rx * Math.sin(rRad) + ry * Math.cos(rRad);
+      return [x, y];
+    });
+
+    const x0 = converted[0][0];
+    const y0 = converted[0][1];
+    
+    const finalPoints = converted.map(([x, y]) => [
+      parseFloat((x - x0).toFixed(2)),
+      parseFloat((y - y0).toFixed(2))
+    ]);
+
+    setHouseCorners(finalPoints);
+
+    const event = new CustomEvent('generate-3d-massing', {
+      detail: {
+        footprint: finalPoints,
+        height: buildingHeight
+      }
+    });
+    window.dispatchEvent(event);
+
+    setIsMarkingMode(false);
+    setMarkedPoints([]);
+  };
+
   // Calculate House Shadow based on buildingHeight (standard 2.8m per floor)
   const elevRad = elevation * Math.PI / 180;
   let shadowLength = 0;
@@ -113,16 +233,15 @@ const Visualization2D = () => {
 
   const rotRad = houseRotation * Math.PI / 180;
 
-  // Center, scale, and rotate corners
+  // Center, scale, and rotate house corners — anchored to plot coordinate system
   const corners = convertedCorners.map(([xm, ym]) => {
-    // Translate relative to center of bounding box
     const x = xm - midX;
     const y = ym - midY;
-    // Rotate
+    // Rotate by houseRotation
     const rx = x * Math.cos(rotRad) - y * Math.sin(rotRad);
     const ry = x * Math.sin(rotRad) + y * Math.cos(rotRad);
-    // Convert to SVG coordinates relative to center (cx, cy)
-    return [cx + rx * scale, cy + ry * scale];
+    // Place house centroid at SVG center; use plotScale for consistency
+    return [cx + rx * scale, cy - ry * scale]; // invert Y so North=up
   });
 
   // Project corners of the shadow
@@ -203,10 +322,57 @@ const Visualization2D = () => {
         </div>
       </div>
 
+      {/* Marking mode controls */}
+      <div className="w-full mb-3 flex flex-col gap-2 bg-desert-50 p-2.5 rounded-xl border border-desert-200 text-xs no-print">
+        <div className="flex justify-between items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setIsMarkingMode(!isMarkingMode);
+              if (!isMarkingMode) {
+                setMarkedPoints([]);
+              }
+            }}
+            className={`flex-grow font-bold py-1.5 px-3 rounded-lg transition-colors border ${
+              isMarkingMode 
+                ? 'bg-terracotta-600 text-white border-terracotta-700 hover:bg-terracotta-700' 
+                : 'bg-white text-desert-700 border-desert-300 hover:bg-desert-50'
+            }`}
+          >
+            {isMarkingMode ? '🛑 ביטול סימון' : '📍 סמן פינות בניין'}
+          </button>
+
+          {isMarkingMode && markedPoints.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setMarkedPoints([])}
+              className="bg-white text-desert-700 border border-desert-300 font-medium py-1.5 px-3 rounded-lg hover:bg-desert-50 transition-colors"
+            >
+              נקה נקודות
+            </button>
+          )}
+        </div>
+
+        {isMarkingMode && (
+          <div className="text-[10px] text-desert-600 leading-tight">
+            לחץ על השרטוט למטה כדי לסמן פינות. {markedPoints.length} נקודות סומנו.
+            {markedPoints.length >= 3 && (
+              <button
+                type="button"
+                onClick={handleGenerate3D}
+                className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg transition-colors shadow-sm flex items-center justify-center gap-1 text-xs"
+              >
+                <span>הפק מסה 3D 🚀</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* SVG Container — width/height driven by canvasSize store value */}
       <div
         className="relative aspect-square rounded-xl overflow-hidden bg-desert-50 border border-desert-200 mx-auto"
-        style={{ width: canvasSize, height: canvasSize }}
+        style={{ width: canvasSize, height: canvasSize, cursor: isMarkingMode ? 'crosshair' : 'default' }}
       >
         
         {/* Directions Labels */}
@@ -217,7 +383,7 @@ const Visualization2D = () => {
           <div className="absolute left-2 top-1/2 -translate-y-1/2">מערב (West)</div>
         </div>
 
-        <svg viewBox="0 0 400 400" className="w-full h-full select-none">
+        <svg viewBox="0 0 400 400" className="w-full h-full select-none" onClick={handleSvgClick}>
           <defs>
             {/* Blur filter for soft shadows */}
             <filter id="shadow-blur" x="-20%" y="-20%" width="140%" height="140%">
@@ -248,18 +414,9 @@ const Visualization2D = () => {
             </marker>
           </defs>
 
-          {/* 1. Sky / Ground Circle */}
-          <rect 
-            x="0" 
-            y="0" 
-            width="400" 
-            height="400" 
-            fill={isNight ? "url(#sky-night)" : isSunset ? "url(#sky-sunset)" : "url(#sky-day)"} 
-          />
-
-          {/* Compass Dial Outer Ring */}
-          <circle cx={cx} cy={cy} r={horizonRadius} fill={groundColor} stroke={skyRingColor} strokeWidth="2" />
-          <circle cx={cx} cy={cy} r={horizonRadius + 12} fill="none" stroke={skyRingColor} strokeWidth="1" strokeDasharray="3 5" opacity="0.5" />
+          {/* 1. Background fill */}
+          <rect x="0" y="0" width="400" height="400"
+            fill={isNight ? "url(#sky-night)" : isSunset ? "url(#sky-sunset)" : "url(#sky-day)"} />
 
           {/* Starfield in Night Mode */}
           {isNight && (
@@ -270,12 +427,50 @@ const Visualization2D = () => {
             </g>
           )}
 
-          {/* Grid lines */}
-          <g stroke={isNight ? "#2e3745" : "#e5d8bf"} strokeWidth="1" opacity="0.4">
-            <line x1={cx - horizonRadius} y1={cy} x2={cx + horizonRadius} y2={cy} />
-            <line x1={cx} y1={cy - horizonRadius} x2={cx} y2={cy + horizonRadius} />
-            <circle cx={cx} cy={cy} r={horizonRadius * 0.66} fill="none" />
-            <circle cx={cx} cy={cy} r={horizonRadius * 0.33} fill="none" />
+          {/* ── PLOT BOUNDARY (קו מגרש) ── */}
+          {/* Street / road strip to east */}
+          <rect
+            x={streetLineStart[0]} y={Math.min(streetLineStart[1], streetLineEnd[1]) - 10}
+            width="30" height={Math.abs(streetLineStart[1] - streetLineEnd[1]) + 20}
+            fill={isNight ? "#1e2a1a" : "#d0cfc8"} opacity="0.7"
+          />
+          {/* Street label */}
+          <text
+            x={streetLineStart[0] + 15}
+            y={(streetLineStart[1] + streetLineEnd[1]) / 2}
+            fontSize="9" fill={isNight ? "#94a3b8" : "#555"}
+            textAnchor="middle" transform={`rotate(-90,${streetLineStart[0]+15},${(streetLineStart[1]+streetLineEnd[1])/2})`}
+          >רחוב</text>
+
+          {/* Plot fill */}
+          <polygon
+            points={plotSvgPoints}
+            fill={isNight ? "#1e2d1e" : "#e8f0e0"}
+            stroke="#2d8a4e"
+            strokeWidth="2"
+          />
+
+          {/* Setback line — אזור מותר לבנייה */}
+          <polygon
+            points={setbackSvgPoints}
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="1.5"
+            strokeDasharray="6 4"
+            opacity="0.85"
+          />
+
+          {/* Street edge line (red) */}
+          <line
+            x1={streetLineStart[0]} y1={streetLineStart[1]}
+            x2={streetLineEnd[0]}   y2={streetLineEnd[1]}
+            stroke="#cc2222" strokeWidth="2"
+          />
+
+          {/* Grid cross-hair (light) */}
+          <g stroke={isNight ? "#2e3745" : "#c8d8b8"} strokeWidth="0.5" opacity="0.5">
+            <line x1="200" y1="20" x2="200" y2="380" />
+            <line x1="20" y1="200" x2="380" y2="200" />
           </g>
 
           {/* 2. Sun Trajectory Path */}
@@ -380,6 +575,62 @@ const Visualization2D = () => {
               </g>
             </g>
           )}
+
+          {/* Render Marked Points */}
+          {markedPoints.map(([px, py], idx) => (
+            <g key={idx}>
+              <circle
+                cx={px}
+                cy={py}
+                r="6"
+                fill="#ef4444"
+                stroke="#ffffff"
+                strokeWidth="1.5"
+              />
+              <circle
+                cx={px}
+                cy={py}
+                r="5"
+                fill="#ef4444"
+                stroke="#ffffff"
+                strokeWidth="1.5"
+              />
+              <text
+                x={px}
+                y={py - 10}
+                fontSize="10"
+                fontWeight="bold"
+                fill="#ef4444"
+                textAnchor="middle"
+              >
+                {idx + 1}
+              </text>
+            </g>
+          ))}
+
+          {/* Render lines connecting marked points */}
+          {markedPoints.length > 1 && (
+            <polyline
+              points={markedPoints.map(([px, py]) => `${px},${py}`).join(' ')}
+              fill="none"
+              stroke="#ef4444"
+              strokeWidth="2"
+              strokeDasharray="4 4"
+            />
+          )}
+
+          {/* Close the polygon if 3+ points */}
+          {markedPoints.length >= 3 && (
+            <line
+              x1={markedPoints[markedPoints.length - 1][0]}
+              y1={markedPoints[markedPoints.length - 1][1]}
+              x2={markedPoints[0][0]}
+              y2={markedPoints[0][1]}
+              stroke="#ef4444"
+              strokeWidth="2"
+              strokeDasharray="4 4"
+            />
+          )}
         </svg>
 
         {/* Night Indicator text overlay */}
@@ -393,16 +644,28 @@ const Visualization2D = () => {
       {/* Legend */}
       <div className="w-full mt-3 grid grid-cols-3 gap-2 text-xs text-desert-800 bg-desert-50 p-2 rounded-lg border border-desert-100">
         <div className="flex items-center gap-1.5 justify-center">
+          <span className="w-3 h-0.5 inline-block bg-[#2d8a4e]"></span>
+          <span>קו מגרש</span>
+        </div>
+        <div className="flex items-center gap-1.5 justify-center">
+          <svg width="14" height="8"><line x1="0" y1="4" x2="14" y2="4" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2"/></svg>
+          <span>קו בנייה (5מ׳/3מ׳)</span>
+        </div>
+        <div className="flex items-center gap-1.5 justify-center">
+          <span className="w-3 h-0.5 inline-block bg-[#cc2222]"></span>
+          <span>קו רחוב</span>
+        </div>
+        <div className="flex items-center gap-1.5 justify-center">
           <span className="w-3 h-3 rounded-full bg-[#fbbf24] border border-[#d97706]"></span>
-          <span>נתיב ומיקום שמש</span>
+          <span>נתיב שמש</span>
         </div>
         <div className="flex items-center gap-1.5 justify-center">
           <span className="w-3 h-3 bg-slate-400/40 rounded-sm border border-slate-400"></span>
-          <span>הצללה מוטלת</span>
+          <span>הצללה</span>
         </div>
         <div className="flex items-center gap-1.5 justify-center">
           <span className="w-3 h-1.5 inline-block bg-sky-500 rounded-sm"></span>
-          <span>רוחות מנושבות</span>
+          <span>רוחות</span>
         </div>
       </div>
     </div>
