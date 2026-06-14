@@ -299,6 +299,10 @@ const MassingImporter = () => {
   // Setback validation state
   const [setbackStatus, setSetbackStatus] = useState(null); // null | { valid, violations }
 
+  // 3D mesh transform controls (position offset + Y rotation)
+  const [meshOffset, setMeshOffset] = useState({ x: 0, z: 0 });
+  const [meshRotY,   setMeshRotY]   = useState(0); // degrees
+
   // Date and Time Simulation state
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedHour, setSelectedHour] = useState(12.0);
@@ -635,6 +639,10 @@ const MassingImporter = () => {
     targetScene.add(mesh);
     meshRef.current = mesh;
 
+    // Reset transform state on each new generate
+    setMeshOffset({ x: 0, z: 0 });
+    setMeshRotY(0);
+
     // Reposition camera to frame the building nicely
     if (cameraRef.current && controlsRef.current) {
       const maxDim = Math.max(width, depth, bbH);
@@ -642,6 +650,28 @@ const MassingImporter = () => {
       controlsRef.current.target.set(0, bbH / 2, 0);
       controlsRef.current.update();
     }
+  };
+
+  // ── Apply transform (position + rotation) to existing mesh ───────────────────
+  const applyTransform = (newOffset, newRotY) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    // Move by delta from previous offset
+    mesh.position.x += newOffset.x - meshOffset.x;
+    mesh.position.z += newOffset.z - meshOffset.z;
+    mesh.rotation.y  = THREE.MathUtils.degToRad(newRotY);
+
+    setMeshOffset(newOffset);
+    setMeshRotY(newRotY);
+
+    // Re-validate setbacks with shifted footprint
+    const envelope = computeBuildableEnvelope(LOT_CORNERS);
+    try {
+      const rawPts = typeof footprintJson === 'string' ? JSON.parse(footprintJson) : footprintJson;
+      const shifted = rawPts.map(([x, z]) => [x + newOffset.x, z + newOffset.z]);
+      setSetbackStatus(validateFootprintInsideEnvelope(shifted, envelope));
+    } catch { /* ignore parse errors */ }
   };
 
   const handleSetTopDownView = () => {
@@ -997,6 +1027,85 @@ const MassingImporter = () => {
                   <span>נקודה [{v.point[0]}, {v.point[1]}] — חורגת ב-<strong>{v.distanceOutside} מ'</strong></span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── 3D Transform Controls ── */}
+          {bbInfo && !error && (
+            <div className="bg-white border border-desert-200 rounded-xl p-3 flex flex-col gap-2">
+              <p className="text-[11px] font-semibold text-desert-700 flex items-center gap-1.5">
+                🕹️ מיקום וסיבוב הבניין על המגרש
+                {(meshOffset.x !== 0 || meshOffset.z !== 0 || meshRotY !== 0) && (
+                  <button
+                    onClick={() => applyTransform({ x: 0, z: 0 }, 0)}
+                    title="אפס מיקום וסיבוב"
+                    className="mr-auto text-[10px] text-desert-400 hover:text-terracotta-600 underline transition-colors"
+                  >
+                    ↺ אפס
+                  </button>
+                )}
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+                {/* X position — West ↔ East */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-desert-500 font-medium">← מע׳ / מז׳ → (X)</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => applyTransform({ ...meshOffset, x: meshOffset.x - 2 }, meshRotY)}
+                      className="w-8 h-8 rounded-lg border border-desert-300 bg-desert-50 hover:bg-terracotta-50 hover:border-terracotta-400 text-xs font-bold transition-colors">−2</button>
+                    <button onClick={() => applyTransform({ ...meshOffset, x: meshOffset.x - 0.5 }, meshRotY)}
+                      className="w-8 h-8 rounded-lg border border-desert-300 bg-desert-50 hover:bg-terracotta-50 hover:border-terracotta-400 text-xs font-bold transition-colors">−½</button>
+                    <span className="flex-1 text-center font-mono text-[11px] text-desert-700 bg-desert-50 border border-desert-200 rounded py-1">
+                      {meshOffset.x >= 0 ? '+' : ''}{meshOffset.x.toFixed(1)}מ׳
+                    </span>
+                    <button onClick={() => applyTransform({ ...meshOffset, x: meshOffset.x + 0.5 }, meshRotY)}
+                      className="w-8 h-8 rounded-lg border border-desert-300 bg-desert-50 hover:bg-terracotta-50 hover:border-terracotta-400 text-xs font-bold transition-colors">+½</button>
+                    <button onClick={() => applyTransform({ ...meshOffset, x: meshOffset.x + 2 }, meshRotY)}
+                      className="w-8 h-8 rounded-lg border border-desert-300 bg-desert-50 hover:bg-terracotta-50 hover:border-terracotta-400 text-xs font-bold transition-colors">+2</button>
+                  </div>
+                </div>
+
+                {/* Z position — South ↔ North */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-desert-500 font-medium">↑ צפון / דרום ↓ (Z)</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => applyTransform({ ...meshOffset, z: meshOffset.z - 2 }, meshRotY)}
+                      className="w-8 h-8 rounded-lg border border-desert-300 bg-desert-50 hover:bg-terracotta-50 hover:border-terracotta-400 text-xs font-bold transition-colors">−2</button>
+                    <button onClick={() => applyTransform({ ...meshOffset, z: meshOffset.z - 0.5 }, meshRotY)}
+                      className="w-8 h-8 rounded-lg border border-desert-300 bg-desert-50 hover:bg-terracotta-50 hover:border-terracotta-400 text-xs font-bold transition-colors">−½</button>
+                    <span className="flex-1 text-center font-mono text-[11px] text-desert-700 bg-desert-50 border border-desert-200 rounded py-1">
+                      {meshOffset.z >= 0 ? '+' : ''}{meshOffset.z.toFixed(1)}מ׳
+                    </span>
+                    <button onClick={() => applyTransform({ ...meshOffset, z: meshOffset.z + 0.5 }, meshRotY)}
+                      className="w-8 h-8 rounded-lg border border-desert-300 bg-desert-50 hover:bg-terracotta-50 hover:border-terracotta-400 text-xs font-bold transition-colors">+½</button>
+                    <button onClick={() => applyTransform({ ...meshOffset, z: meshOffset.z + 2 }, meshRotY)}
+                      className="w-8 h-8 rounded-lg border border-desert-300 bg-desert-50 hover:bg-terracotta-50 hover:border-terracotta-400 text-xs font-bold transition-colors">+2</button>
+                  </div>
+                </div>
+
+                {/* Y Rotation */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-desert-500 font-medium">↻ סיבוב (Y)</span>
+                    <span className="font-mono text-[11px] text-desert-700">{meshRotY}°</span>
+                  </div>
+                  <input type="range" min={0} max={360} step={5} value={meshRotY}
+                    onChange={e => applyTransform(meshOffset, Number(e.target.value))}
+                    className="w-full accent-terracotta-600"/>
+                  <div className="flex gap-1 justify-center">
+                    {[0, 45, 90, 135, 180, 270].map(deg => (
+                      <button key={deg} onClick={() => applyTransform(meshOffset, deg)}
+                        className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors
+                          ${meshRotY === deg
+                            ? 'bg-terracotta-600 text-white border-terracotta-600'
+                            : 'border-desert-300 text-desert-500 hover:border-terracotta-400'}`}>
+                        {deg}°
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
