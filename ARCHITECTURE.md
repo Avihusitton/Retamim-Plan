@@ -166,8 +166,8 @@ Component: `src/components/FloorPlanAutoTracer.jsx`
 Decision: OpenCV.js is loaded from the official CDN (`https://docs.opencv.org/4.8.0/opencv.js`)
 via a `<script async>` tag in `index.html`, NOT as an npm package.
 Reason: The npm package for OpenCV.js (`opencv.js`) is 8MB+ and complicates Vite bundling.
-The CDN approach loads asynchronously, polled via `window.cv && window.cv.Mat`.
-Pixel→meter conversion uses a user-supplied `pixelsPerMeter` value (default: 20).
+The CDN approach loads asynchronously, polled via `window.cv?.Mat`.
+Pixel→meter conversion uses `x_meters = px / pixelsPerMeter` and `y_meters = (imgHeight - py) / pixelsPerMeter` to properly align the coordinate origin with the bottom-left corner.
 The contour algorithm: Canny edge detection → findContours (RETR_EXTERNAL) →
 approxPolyDP (epsilon = 2% arc length) → largest contour by area.
 All OpenCV Mats are explicitly deleted to prevent WASM heap leaks.

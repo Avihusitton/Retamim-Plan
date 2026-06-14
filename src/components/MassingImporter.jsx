@@ -894,7 +894,7 @@ const MassingImporter = () => {
             </p>
           </div>
 
-          {/* ── Auto Floor-Plan Tracer (OpenCV) ── */}
+          {/* 📐 ייבוא מסכמה אוטומטי */}
           <div className="flex flex-col gap-2">
             <button
               id="btn-toggle-floor-plan-tracer"
@@ -902,7 +902,7 @@ const MassingImporter = () => {
               className="flex items-center gap-2 text-xs font-semibold text-desert-700 hover:text-terracotta-600 transition-colors self-start"
             >
               <span>{showTracer ? '▲' : '▼'}</span>
-              🖼 זיהוי אוטומטי מתכנית קומה (OpenCV)
+              📐 ייבוא מסכמה אוטומטי
             </button>
             {showTracer && (
               <FloorPlanAutoTracer

@@ -7,20 +7,18 @@
  * onCornersExtracted([[x,y], ...]) with pixel→meter converted corners.
  *
  * OpenCV.js must be loaded in index.html:
- *   <script async src="https://docs.opencv.org/4.8.0/opencv.js"
- *           onload="window.openCvReady=true"></script>
+ *   <script async src="https://docs.opencv.org/4.8.0/opencv.js"></script>
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AlertCircle, Upload, CheckCheck, RotateCcw } from 'lucide-react';
 
 // ─── OpenCV readiness helper ─────────────────────────────────────────────────
-const waitForOpenCV = () =>
+const waitForCV = () =>
   new Promise((resolve) => {
-    if (window.cv && window.cv.Mat) return resolve();
-    const id = setInterval(() => {
-      if (window.cv && window.cv.Mat) {
-        clearInterval(id);
+    const check = setInterval(() => {
+      if (window.cv?.Mat) {
+        clearInterval(check);
         resolve();
       }
     }, 100);
@@ -70,7 +68,6 @@ const detectContours = (imgElement) => {
 
   src.delete(); gray.delete(); blurred.delete(); edges.delete();
   contours.delete(); hierarchy.delete(); approx.delete();
-  // Note: contour is a view into MatVector — do not delete separately
 
   return corners; // pixel [x, y]
 };
@@ -102,23 +99,23 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
 
     if (pts.length < 2) return;
 
-    // Polygon
+    // Blue Polygon Overlay
     ctx.beginPath();
     ctx.moveTo(pts[0][0], pts[0][1]);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
     ctx.closePath();
-    ctx.strokeStyle = 'rgba(255,80,80,0.85)';
+    ctx.strokeStyle = '#3b82f6'; // Blue
     ctx.lineWidth   = Math.max(2, canvas.width / 300);
     ctx.stroke();
-    ctx.fillStyle   = 'rgba(255,80,80,0.08)';
+    ctx.fillStyle   = 'rgba(59, 130, 246, 0.08)'; // Transparent blue fill
     ctx.fill();
 
-    // Corner dots
+    // Red Corner dots
     const r = Math.max(6, canvas.width / 80);
     pts.forEach(([x, y], i) => {
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 2 * Math.PI);
-      ctx.fillStyle   = '#ef4444';
+      ctx.fillStyle   = '#ef4444'; // Red
       ctx.strokeStyle = '#fff';
       ctx.lineWidth   = 2;
       ctx.fill();
@@ -157,7 +154,7 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
 
       // Wait for OpenCV then process
       try {
-        await waitForOpenCV();
+        await waitForCV();
         setStatus('processing');
 
         // Give React one tick to render the <img> element
@@ -240,9 +237,11 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
   // ── Confirm: convert pixels → meters and call callback ───────────────────
   const handleConfirm = () => {
     const ppm = Math.max(1, Number(pixelsPerMeter) || 20);
+    const imgEl = imgRef.current;
+    const imgHeight = imgEl ? imgEl.naturalHeight : 0;
     const metersCorners = corners.map(([px, py]) => [
       Math.round((px / ppm) * 100) / 100,
-      Math.round((py / ppm) * 100) / 100,
+      Math.round(((imgHeight - py) / ppm) * 100) / 100,
     ]);
     onCornersExtracted(metersCorners);
   };
@@ -261,8 +260,8 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
     <div className="bg-desert-50 border border-desert-200 rounded-xl p-4 flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-xs font-semibold text-desert-700 flex items-center gap-1.5">
-          🖼 זיהוי אוטומטי של קונטור תכנית קומה (OpenCV.js)
+        <p className="text-xs font-semibold text-desert-700 flex items-center gap-1.5 font-sans">
+          📐 זיהוי קונטור מתכנית קומה (OpenCV.js)
         </p>
         {status !== 'idle' && (
           <button
@@ -284,9 +283,9 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
         >
           <Upload className="w-7 h-7 text-desert-400" />
           <span className="text-xs text-desert-600 font-semibold">
-            גרור תמונה לכאן, או לחץ לבחירה
+            גרור סכמה לכאן או לחץ להעלאה
           </span>
-          <span className="text-[10px] text-desert-400">PNG / JPG / WEBP</span>
+          <span className="text-[10px] text-desert-400">PNG / JPG</span>
           <input
             type="file"
             accept="image/*"
@@ -296,11 +295,11 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
         </label>
       )}
 
-      {/* Scale input — shown when idle or processing */}
+      {/* Scale input — shown when idle or done */}
       {(status === 'idle' || status === 'done') && (
         <div className="flex items-center gap-2 text-xs text-desert-700">
-          <label htmlFor="ftc-ppm" className="whitespace-nowrap">
-            קנה מידה:
+          <label htmlFor="ftc-ppm" className="whitespace-nowrap font-medium">
+            1 מטר = כמה פיקסלים?
           </label>
           <input
             id="ftc-ppm"
@@ -309,9 +308,8 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
             max={500}
             value={pixelsPerMeter}
             onChange={e => setPixelsPerMeter(e.target.value)}
-            className="w-20 p-1.5 border border-desert-300 rounded-lg text-xs font-mono bg-white focus:ring-2 focus:ring-terracotta-400"
+            className="w-20 p-1.5 border border-desert-300 rounded-lg text-xs font-mono bg-white focus:ring-2 focus:ring-terracotta-400 focus:outline-none"
           />
-          <span className="text-desert-500">פיקסלים = 1 מ'</span>
         </div>
       )}
 
@@ -320,7 +318,7 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
         <div className="flex flex-col items-center gap-3 py-6">
           <div className="w-8 h-8 border-4 border-terracotta-200 border-t-terracotta-600 rounded-full animate-spin" />
           <span className="text-xs text-desert-600 font-semibold">
-            {status === 'loading-cv' ? 'טוען OpenCV...' : 'מזהה קונטורים...'}
+            {status === 'loading-cv' ? '🔍 טוען OpenCV...' : '🔍 מזהה קונטורים...'}
           </span>
           {/* Keep image mounted (hidden) so OpenCV can read it */}
           {imgSrc && (
@@ -379,26 +377,26 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
       {status === 'done' && (
         <>
           <p className="text-[10px] text-desert-500 text-center italic">
-            לא מדויק? גרור את הנקודות האדומות לתיקון
+            לא מדויק? גרור את הנקודות לתיקון
           </p>
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
             <span className="text-[10px] text-desert-600 bg-white border border-desert-200 rounded-full px-2.5 py-1">
               {corners.length} פינות זוהו
             </span>
             <button
               id="btn-floor-plan-confirm"
               onClick={handleConfirm}
-              className="flex items-center gap-2 bg-terracotta-600 hover:bg-terracotta-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-xs"
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-xs shadow-sm"
             >
               <CheckCheck className="w-4 h-4" />
-              ← אשר ויבא לתכנון
+              ← אשר ויבא
             </button>
           </div>
         </>
       )}
 
       {/* Disclaimer */}
-      <p className="text-[10px] text-desert-400 italic">
+      <p className="text-[10px] text-desert-400 italic text-center">
         כלי זה אינו תחליף לייעוץ אדריכלי או הנדסי מקצועי
       </p>
     </div>
