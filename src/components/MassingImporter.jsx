@@ -14,6 +14,7 @@ import { generateMassing } from '../utils/buildingMassing';
 import { wgs84ToLocalMeters } from '../utils/coordsToMeters';
 import { getSunPosition } from '../utils/solarCalculator';
 import { createPlotGround } from '../utils/plotGround';
+import FloorPlanAutoTracer from './FloorPlanAutoTracer';
 
 // ─── Compass Texture Generation ─────────────────────────────────────────────
 const createCompassTexture = () => {
@@ -270,6 +271,9 @@ function validateFootprintInsideEnvelope(footprintPoints, envelope) {
 const MassingImporter = () => {
   // Panel open/closed
   const [isOpen, setIsOpen] = useState(true);
+
+  // Auto-tracer panel visibility
+  const [showTracer, setShowTracer] = useState(false);
 
   // Form state
   const [footprintJson, setFootprintJson] = useState(DEFAULT_FOOTPRINT);
@@ -888,6 +892,26 @@ const MassingImporter = () => {
             <p className="text-[10px] text-desert-400">
               הנקודה הראשונה תהפוך לנקודת ייחוס [0,0]. הקואורדינטות יועברו אוטומטית לשדה הבסיס שלמטה.
             </p>
+          </div>
+
+          {/* ── Auto Floor-Plan Tracer (OpenCV) ── */}
+          <div className="flex flex-col gap-2">
+            <button
+              id="btn-toggle-floor-plan-tracer"
+              onClick={() => setShowTracer(v => !v)}
+              className="flex items-center gap-2 text-xs font-semibold text-desert-700 hover:text-terracotta-600 transition-colors self-start"
+            >
+              <span>{showTracer ? '▲' : '▼'}</span>
+              🖼 זיהוי אוטומטי מתכנית קומה (OpenCV)
+            </button>
+            {showTracer && (
+              <FloorPlanAutoTracer
+                onCornersExtracted={(corners) => {
+                  setFootprintJson(JSON.stringify(corners));
+                  setShowTracer(false);
+                }}
+              />
+            )}
           </div>
 
           {/* Form row */}
