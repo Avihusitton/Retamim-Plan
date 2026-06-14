@@ -569,20 +569,28 @@ const MassingImporter = () => {
 
     // ── Setback validation ───────────────────────────────────────────────────
     const envelope = computeBuildableEnvelope(LOT_CORNERS);
-    const validation = validateFootprintInsideEnvelope(points, envelope);
+    let workingPoints = points;
+
+    // Auto-fit: if footprint violates envelope, shift it to the envelope centroid
+    const firstCheck = validateFootprintInsideEnvelope(workingPoints, envelope);
+    if (!firstCheck.valid) {
+      // Centroid of envelope
+      const envCx = envelope.reduce((s, p) => s + p.x, 0) / envelope.length;
+      const envCz = envelope.reduce((s, p) => s + p.z, 0) / envelope.length;
+      // Centroid of footprint (scene-centered)
+      const fpCx = workingPoints.reduce((s, p) => s + p[0], 0) / workingPoints.length;
+      const fpCz = workingPoints.reduce((s, p) => s + p[1], 0) / workingPoints.length;
+      const dx = envCx - fpCx, dz = envCz - fpCz;
+      workingPoints = workingPoints.map(([x, z]) => [x + dx, z + dz]);
+    }
+
+    const validation = validateFootprintInsideEnvelope(workingPoints, envelope);
     setSetbackStatus(validation);
 
     // Draw / refresh the envelope dashed line in the scene
     drawEnvelopeLine(targetScene);
 
-    // Block mesh generation if footprint violates setbacks
-    if (!validation.valid) {
-      const lines = validation.violations
-        .map(v => `נקודה [${v.point[0]}, ${v.point[1]}] חורגת ב-${v.distanceOutside} מ'`)
-        .join(' | ');
-      setError(`⚠️ חריגה מקווי בניין: ${lines}`);
-      return;
-    }
+    // Always continue — violation shows as amber warning only (never blocks)
 
     // Remove old mesh
     if (meshRef.current) {
@@ -592,10 +600,10 @@ const MassingImporter = () => {
       meshRef.current = null;
     }
 
-    // Generate new geometry
+    // Generate new geometry (use auto-fitted points if available)
     let geometry;
     try {
-      geometry = generateMassing(points, h);
+      geometry = generateMassing(workingPoints, h);
     } catch (err) {
       setError(`שגיאה ביצירת הגאומטריה: ${err.message}`);
       return;
@@ -908,7 +916,7 @@ const MassingImporter = () => {
               <FloorPlanAutoTracer
                 onCornersExtracted={(corners) => {
                   setFootprintJson(JSON.stringify(corners));
-                  setShowTracer(false);
+                  // intentionally NOT closing the tracer — user can keep editing and re-import
                 }}
               />
             )}
@@ -980,12 +988,13 @@ const MassingImporter = () => {
             <div className="flex flex-col gap-1 bg-amber-50 border border-amber-300 text-amber-900 text-xs p-2.5 rounded-lg">
               <div className="flex items-center gap-2 font-semibold">
                 <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                <span>חריגה מקווי בניין (הבניין חוסם)</span>
+                <span>⚠️ אזהרה: גם לאחר מרכוז אוטומטי — חריגה מקווי בניין</span>
               </div>
+              <p className="text-[10px] text-amber-700 pl-6">הבניין מוצג על המפה אך חורג מהמעטפת המותרת. ניתן לערוך את הבסיס ולנסות שוב.</p>
               {setbackStatus.violations.map((v, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-[10px] text-amber-800 pl-6">
                   <span>▸</span>
-                  <span>נקודה [{v.point[0]}, {v.point[1]}] — חורגת ב-<strong>{v.distanceOutside} מ'</strong> מעבר לקו הבניין</span>
+                  <span>נקודה [{v.point[0]}, {v.point[1]}] — חורגת ב-<strong>{v.distanceOutside} מ'</strong></span>
                 </div>
               ))}
             </div>

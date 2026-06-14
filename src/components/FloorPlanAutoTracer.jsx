@@ -125,6 +125,7 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
   const [selIdx,    setSelIdx]    = useState(-1);
   const [calibPts,  setCalibPts]  = useState([]);    // up to 2 [x,y] pixel points
   const [calibM,    setCalibM]    = useState('');    // known real distance in meters
+  const [confirmed,  setConfirmed] = useState(false); // flash ✓ after import without closing
 
   const imgRef = useRef(null), canvasRef = useRef(null);
 
@@ -242,6 +243,8 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
       Math.round((px/ppm)*100)/100,
       Math.round(((h-py)/ppm)*100)/100,
     ]));
+    setConfirmed(true);
+    setTimeout(() => setConfirmed(false), 2500);
   };
 
   const cursor = () => {
@@ -412,8 +415,12 @@ const FloorPlanAutoTracer = ({ onCornersExtracted }) => {
         <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
           <p className="text-[10px] text-desert-500 italic">גרור נקודות · לחצן ימני = מחיקה · כייל לפי מרחק ידוע</p>
           <button id="btn-floor-plan-confirm" onClick={handleConfirm}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-xs shadow-sm">
-            <CheckCheck className="w-4 h-4"/> ← אשר ויבא
+            className={`flex items-center gap-2 font-semibold py-2 px-4 rounded-lg transition-colors text-xs shadow-sm
+              ${confirmed
+                ? 'bg-blue-600 text-white'
+                : 'bg-green-600 hover:bg-green-700 text-white'}`}>
+            <CheckCheck className="w-4 h-4"/>
+            {confirmed ? '✓ יובא לשדה הבסיס' : '← אשר ויבא'}
           </button>
         </div>
       </>)}
