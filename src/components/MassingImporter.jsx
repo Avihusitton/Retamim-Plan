@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Building2, ChevronDown, ChevronUp, RefreshCw, AlertCircle, ArrowDownToLine } from 'lucide-react';
+import { Building2, ChevronDown, ChevronUp, RefreshCw, AlertCircle, ArrowDownToLine, Eye } from 'lucide-react';
 import { generateMassing } from '../utils/buildingMassing';
 import { wgs84ToLocalMeters } from '../utils/coordsToMeters';
 import { getSunPosition } from '../utils/solarCalculator';
@@ -489,6 +489,17 @@ const MassingImporter = () => {
     }
   };
 
+  const handleSetTopDownView = () => {
+    if (cameraRef.current && controlsRef.current) {
+      // Set camera to look straight down.
+      // Small offset in Z to prevent OrbitControls gimbal lock while keeping default Up vector.
+      cameraRef.current.position.set(0, 45, 0.01);
+      controlsRef.current.target.set(0, 0, 0);
+      controlsRef.current.update();
+    }
+  };
+
+
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <section className="bg-white rounded-xl shadow-sm border border-desert-200 overflow-hidden">
@@ -664,6 +675,16 @@ const MassingImporter = () => {
               className="w-full"
               style={{ height: 420 }}
             />
+            {/* Reset to 2D Top-down View button */}
+            <button
+              onClick={handleSetTopDownView}
+              className="absolute top-4 left-4 bg-white/90 hover:bg-white text-desert-800 backdrop-blur-sm p-2 rounded-lg shadow-md border border-desert-200 hover:border-desert-300 font-semibold text-xs transition-all flex items-center gap-1.5 z-10 cursor-pointer select-none"
+              title="אפס למבט על (דו-ממד)"
+            >
+              <Eye className="w-3.5 h-3.5 text-terracotta-600" />
+              <span>מבט על (2D)</span>
+            </button>
+
             {/* Compass Overlay in top-right */}
             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-1.5 rounded-full shadow-md border border-desert-200 flex items-center justify-center pointer-events-none z-10 select-none">
               <div
