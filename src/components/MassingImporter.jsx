@@ -281,6 +281,18 @@ const MassingImporter = () => {
   const [error,         setError]         = useState('');
   const [bbInfo,        setBbInfo]        = useState(null);  // { width, depth, height }
 
+  // Saved Models state
+  const [savedModels, setSavedModels] = useState([]);
+  const [savedModelName, setSavedModelName] = useState('');
+
+  // Load saved models on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('retamim_saved_models');
+      if (stored) setSavedModels(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
+
   // WGS84 converter state
   const [wgs84Input, setWgs84Input] = useState('');
   const [wgs84Error, setWgs84Error] = useState('');
@@ -684,6 +696,45 @@ const MassingImporter = () => {
     }
   };
 
+  // ── Save / Load Models ──────────────────────────────────────────────────
+  const handleSaveModel = () => {
+    if (!footprintJson || !savedModelName.trim()) return;
+    const newModel = {
+      id: Date.now().toString(),
+      name: savedModelName.trim(),
+      footprintJson,
+      height,
+      meshOffset,
+      meshRotY,
+      date: new Date().toLocaleDateString('he-IL')
+    };
+    const updated = [...savedModels, newModel];
+    setSavedModels(updated);
+    localStorage.setItem('retamim_saved_models', JSON.stringify(updated));
+    setSavedModelName('');
+  };
+
+  const handleLoadModel = (model) => {
+    setFootprintJson(model.footprintJson);
+    setHeight(model.height);
+    // When generating, we'll need to apply transforms. 
+    // We can do this by wrapping handleGenerate.
+    setTimeout(() => {
+      // Generate standard mesh
+      handleGenerate(null, model.footprintJson, model.height);
+      // Then re-apply saved transforms
+      setTimeout(() => {
+        applyTransform(model.meshOffset || {x:0, z:0}, model.meshRotY || 0);
+      }, 50);
+    }, 50);
+  };
+
+  const handleDeleteModel = (id) => {
+    const updated = savedModels.filter(m => m.id !== id);
+    setSavedModels(updated);
+    localStorage.setItem('retamim_saved_models', JSON.stringify(updated));
+  };
+
   // ── Draw / refresh the buildable envelope dashed line in the scene ──────────
   const drawEnvelopeLine = (targetScene) => {
     const scene = targetScene || sceneRef.current;
@@ -946,7 +997,8 @@ const MassingImporter = () => {
               <FloorPlanAutoTracer
                 onCornersExtracted={(corners) => {
                   setFootprintJson(JSON.stringify(corners));
-                  // intentionally NOT closing the tracer — user can keep editing and re-import
+                  setShowTracer(false);
+                  setTimeout(() => handleGenerate(), 100);
                 }}
               />
             )}
